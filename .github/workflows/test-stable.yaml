@@ -31,8 +31,5 @@ jobs:
           ]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
       - name: Verify GitHub Workflows
         uses: durandtibo/verify-github-workflow-action@v0.0.1
