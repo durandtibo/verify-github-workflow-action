@@ -1,0 +1,31 @@
+name: "Verify GitHub Workflows"
+description: "Verify the GitHub Workflows"
+
+author: "Thibaut Durand"
+
+branding:
+  icon: "check-circle"
+  color: "blue"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Install actionlint
+      shell: bash
+      run: |
+        ACTIONLINT_URL="https://raw.githubusercontent.com/rhysd/actionlint/"
+        ACTIONLINT_URL+="main/scripts/download-actionlint.bash"
+        bash <(curl -sSL $ACTIONLINT_URL) latest
+
+    - name: actionlint version
+      shell: bash
+      run: |
+        ./actionlint --version
+
+    - name: Run actionlint on workflow files
+      shell: bash
+      run: |
+        ./actionlint .github/workflows/*
