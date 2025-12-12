@@ -76,7 +76,6 @@ There are many ways to contribute to this project:
    ```
 
 2. **Make your changes**
-
    - Edit the relevant files
    - Follow the existing code style and conventions
    - Add or update tests as needed
@@ -158,31 +157,26 @@ by the CI pipeline when you submit your pull request.
 ## Pull Request Process
 
 1. **Ensure all checks pass**
-
    - All CI checks must pass
    - Code must be properly formatted
    - Tests must pass on all supported platforms
 
 2. **Update documentation**
-
    - Update the README.md if you're adding new features
    - Add comments to complex code sections
    - Update relevant examples
 
 3. **Fill out the pull request template**
-
    - Provide a clear description of your changes
    - Link to any related issues
    - Check all items in the PR checklist
 
 4. **Request a review**
-
    - Wait for a maintainer to review your PR
    - Address any feedback or requested changes
    - Be patient and respectful during the review process
 
 5. **Merge**
-
    - Once approved, a maintainer will merge your PR
    - Your contribution will be included in the next release
 
