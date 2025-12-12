@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.1
+        uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
 
 ### Minimal Example
@@ -54,7 +54,7 @@ jobs:
 ```yaml
 steps:
   - name: Verify Workflows
-    uses: durandtibo/verify-github-workflow-action@v0.0.1
+    uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
 
 ## How It Works
@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.1
+        uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
 
 ### Multiple OS Testing
@@ -111,7 +111,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.1
+        uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
 
 ### Scheduled Workflow Verification
@@ -128,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.1
+        uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
 
 ## Requirements
