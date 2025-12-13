@@ -90,13 +90,6 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: Run tests
-        run: make test
-
   verify-workflows:
     runs-on: ubuntu-latest
     steps:
