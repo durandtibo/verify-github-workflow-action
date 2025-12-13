@@ -49,7 +49,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.2
+        uses: durandtibo/verify-github-workflow-action@v0.0.3
 ```
 
 ### Minimal Example
@@ -60,7 +60,7 @@ steps:
     uses: actions/checkout@v6
 
   - name: Verify GitHub Workflows
-    uses: durandtibo/verify-github-workflow-action@v0.0.2
+    uses: durandtibo/verify-github-workflow-action@v0.0.3
 ```
 
 ## How It Works
@@ -97,7 +97,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.2
+        uses: durandtibo/verify-github-workflow-action@v0.0.3
 ```
 
 ### Multiple OS Testing
@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.2
+        uses: durandtibo/verify-github-workflow-action@v0.0.3
 ```
 
 ### Scheduled Workflow Verification
@@ -138,7 +138,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.2
+        uses: durandtibo/verify-github-workflow-action@v0.0.3
 ```
 
 ## Requirements
