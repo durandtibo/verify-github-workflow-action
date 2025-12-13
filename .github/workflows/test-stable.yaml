@@ -40,3 +40,18 @@ jobs:
 
       - name: Verify GitHub Workflows
         uses: durandtibo/verify-github-workflow-action@v0.0.2
+
+  test-inputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify GitHub Workflows
+        uses: durandtibo/verify-github-workflow-action@v0.0.2
+        with:
+          paths: ".github/workflows/*.yaml"
+          version: "1.7.9"
+          flags: "-format {{json .}}"
