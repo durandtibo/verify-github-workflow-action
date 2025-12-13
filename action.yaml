@@ -1,5 +1,5 @@
 name: "Verify GitHub Workflows"
-description: "Verify the GitHub Workflows"
+description: "Verify the GitHub Workflows using actionlint"
 
 author: "Thibaut Durand"
 
@@ -7,22 +7,57 @@ branding:
   icon: "check-circle"
   color: "blue"
 
+inputs:
+  paths:
+    description: >
+      Paths or glob patterns to workflow files.
+      Defaults to `.github/workflows/*`
+    required: false
+    default: ".github/workflows/*"
+
+  version:
+    description: "Version of actionlint to install (default: latest)"
+    required: false
+    default: "latest"
+
+  flags:
+    description: "Additional flags to pass to actionlint"
+    required: false
+    default: ""
+
 runs:
   using: "composite"
   steps:
+    # Download and install actionlint using the official installer script
     - name: Install actionlint
       shell: bash
       run: |
-        ACTIONLINT_URL="https://raw.githubusercontent.com/rhysd/actionlint/"
-        ACTIONLINT_URL+="main/scripts/download-actionlint.bash"
-        bash <(curl -sSL $ACTIONLINT_URL) latest
+        set -euo pipefail
+        echo "📦 Installing actionlint ${{ inputs.version }}..."
 
-    - name: actionlint version
+        ACTIONLINT_URL="https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash"
+        bash <(curl -sSL "$ACTIONLINT_URL") ${{ inputs.version }}
+
+    # Verify that actionlint was installed correctly
+    - name: Verify actionlint installation
       shell: bash
       run: |
-        ./actionlint --version
+        set -euo pipefail
+        if [ -f ./actionlint ]; then
+          echo "✅ actionlint installed successfully"
+          ./actionlint --version
+        else
+          echo "❌ actionlint installation failed"
+          exit 1
+        fi
 
+    # Run actionlint against workflow files
     - name: Run actionlint on workflow files
       shell: bash
       run: |
-        ./actionlint .github/workflows/*
+        set -euo pipefail
+        echo "🔍 Running actionlint on GitHub workflows..."
+
+        ./actionlint ${{ inputs.flags }} ${{ inputs.paths }}
+
+        echo "✅ All workflows verified successfully!"
