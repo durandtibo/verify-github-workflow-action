@@ -45,6 +45,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Verify GitHub Workflows
         uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
@@ -53,7 +56,10 @@ jobs:
 
 ```yaml
 steps:
-  - name: Verify Workflows
+  - name: Checkout
+    uses: actions/checkout@v6
+
+  - name: Verify GitHub Workflows
     uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
 
@@ -61,13 +67,15 @@ steps:
 
 This action performs the following steps:
 
-1. **Checkout**: Checks out your repository code
-2. **Install actionlint**: Downloads and installs the latest version of actionlint
-3. **Version Check**: Displays the installed actionlint version for debugging
-4. **Validate**: Runs actionlint on all workflow files in `.github/workflows/`
+1. **Install actionlint**: Downloads and installs the latest version of actionlint
+2. **Version Check**: Displays the installed actionlint version for debugging
+3. **Validate**: Runs actionlint on all workflow files in `.github/workflows/`
 
 The action will fail if any errors are found in your workflow files, helping you catch
 issues before they cause problems in production.
+
+**Note**: The action requires your repository code to be checked out first using
+`actions/checkout` before it can validate the workflow files.
 
 ## Examples
 
@@ -92,6 +100,9 @@ jobs:
   verify-workflows:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Verify GitHub Workflows
         uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
@@ -110,6 +121,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Verify GitHub Workflows
         uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
@@ -127,14 +141,17 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Verify GitHub Workflows
         uses: durandtibo/verify-github-workflow-action@v0.0.2
 ```
 
 ## Requirements
 
-- The action requires checkout to be performed first (it's handled automatically by
-  the action)
+- **The action requires your repository code to be checked out first using
+  `actions/checkout` before running the verification**
 - Your repository must contain workflow files in `.github/workflows/` directory
 - The runner must have bash available (standard on all GitHub-hosted runners)
 
