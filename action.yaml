@@ -38,18 +38,13 @@ runs:
         ACTIONLINT_URL="https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash"
         bash <(curl -sSL "$ACTIONLINT_URL") ${{ inputs.version }}
 
-        # Move to a location in PATH for easier access
-        sudo mv ./actionlint /usr/local/bin/actionlint || mv ./actionlint "$HOME/.local/bin/actionlint" || true
-
     # Verify that actionlint was installed correctly
     - name: Verify actionlint installation
       shell: bash
       run: |
-        if command -v actionlint &> /dev/null; then
+        set -euo pipefail
+        if [ -f ./actionlint ]; then
           echo "✅ actionlint installed successfully"
-          actionlint --version
-        elif [ -f ./actionlint ]; then
-          echo "✅ actionlint available in current directory"
           ./actionlint --version
         else
           echo "❌ actionlint installation failed"
@@ -63,14 +58,6 @@ runs:
         set -euo pipefail
         echo "🔍 Running actionlint on GitHub workflows..."
 
-        # Use actionlint from PATH if available, otherwise use local copy
-        if command -v actionlint &> /dev/null; then
-          ACTIONLINT_CMD="actionlint"
-        else
-          ACTIONLINT_CMD="./actionlint"
-        fi
-
-        # Run actionlint with specified paths and any additional flags
-        $ACTIONLINT_CMD ${{ inputs.flags }} ${{ inputs.paths }}
+        ./actionlint ${{ inputs.flags }} ${{ inputs.paths }}
 
         echo "✅ All workflows verified successfully!"
