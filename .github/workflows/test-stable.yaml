@@ -54,4 +54,4 @@ jobs:
         with:
           paths: ".github/workflows/*.yaml"
           version: "1.7.9"
-          flags: "-format {{json .}}"
+          flags: "-format '{{json .}}'"
