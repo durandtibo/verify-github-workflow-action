@@ -30,22 +30,27 @@ runs:
   steps:
     # Download and install actionlint using the official installer script
     - name: Install actionlint
+      id: install
       shell: bash
+      env:
+        ACTIONLINT_VERSION: ${{ inputs.version }}
       run: |
         set -euo pipefail
-        echo "📦 Installing actionlint ${{ inputs.version }}..."
+        echo "📦 Installing actionlint ${ACTIONLINT_VERSION}..."
 
         ACTIONLINT_URL="https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash"
-        bash <(curl -sSL "$ACTIONLINT_URL") ${{ inputs.version }}
+        bash <(curl -sSL "$ACTIONLINT_URL") "$ACTIONLINT_VERSION"
 
     # Verify that actionlint was installed correctly
     - name: Verify actionlint installation
       shell: bash
+      env:
+        ACTIONLINT_EXECUTABLE: ${{ steps.install.outputs.executable }}
       run: |
         set -euo pipefail
-        if [ -f ./actionlint ]; then
+        if [ -f "$ACTIONLINT_EXECUTABLE" ]; then
           echo "✅ actionlint installed successfully"
-          ./actionlint --version
+          "$ACTIONLINT_EXECUTABLE" --version
         else
           echo "❌ actionlint installation failed"
           exit 1
@@ -54,10 +59,31 @@ runs:
     # Run actionlint against workflow files
     - name: Run actionlint on workflow files
       shell: bash
+      env:
+        ACTIONLINT_EXECUTABLE: ${{ steps.install.outputs.executable }}
+        ACTIONLINT_FLAGS: ${{ inputs.flags }}
+        ACTIONLINT_PATHS: ${{ inputs.paths }}
       run: |
         set -euo pipefail
         echo "🔍 Running actionlint on GitHub workflows..."
 
-        ./actionlint ${{ inputs.flags }} ${{ inputs.paths }}
+        # Tokenize flags with xargs (honors quoting, e.g. -format '{{json .}}')
+        # without ever re-parsing the value as shell code, so it can't be used
+        # for command injection. Skip entirely when empty: GNU xargs (Linux)
+        # and BSD xargs (macOS) disagree on whether an empty string yields
+        # zero tokens or one empty token.
+        flags=()
+        if [ -n "$ACTIONLINT_FLAGS" ]; then
+          while IFS= read -r flag; do
+            flags+=("$flag")
+          done < <(xargs -n1 <<< "$ACTIONLINT_FLAGS")
+        fi
+
+        # shellcheck disable=SC2086
+        if [ "${#flags[@]}" -gt 0 ]; then
+          "$ACTIONLINT_EXECUTABLE" "${flags[@]}" $ACTIONLINT_PATHS
+        else
+          "$ACTIONLINT_EXECUTABLE" $ACTIONLINT_PATHS
+        fi
 
         echo "✅ All workflows verified successfully!"
