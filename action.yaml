@@ -76,6 +76,10 @@ runs:
         done < <(xargs -n1 <<< "$ACTIONLINT_FLAGS")
 
         # shellcheck disable=SC2086
-        "$ACTIONLINT_EXECUTABLE" "${flags[@]+"${flags[@]}"}" $ACTIONLINT_PATHS
+        if [ "${#flags[@]}" -gt 0 ]; then
+          "$ACTIONLINT_EXECUTABLE" "${flags[@]}" $ACTIONLINT_PATHS
+        else
+          "$ACTIONLINT_EXECUTABLE" $ACTIONLINT_PATHS
+        fi
 
         echo "✅ All workflows verified successfully!"
