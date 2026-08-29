@@ -69,11 +69,15 @@ runs:
 
         # Tokenize flags with xargs (honors quoting, e.g. -format '{{json .}}')
         # without ever re-parsing the value as shell code, so it can't be used
-        # for command injection.
+        # for command injection. Skip entirely when empty: GNU xargs (Linux)
+        # and BSD xargs (macOS) disagree on whether an empty string yields
+        # zero tokens or one empty token.
         flags=()
-        while IFS= read -r flag; do
-          flags+=("$flag")
-        done < <(xargs -n1 <<< "$ACTIONLINT_FLAGS")
+        if [ -n "$ACTIONLINT_FLAGS" ]; then
+          while IFS= read -r flag; do
+            flags+=("$flag")
+          done < <(xargs -n1 <<< "$ACTIONLINT_FLAGS")
+        fi
 
         # shellcheck disable=SC2086
         if [ "${#flags[@]}" -gt 0 ]; then
