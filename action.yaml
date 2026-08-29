@@ -67,7 +67,15 @@ runs:
         set -euo pipefail
         echo "🔍 Running actionlint on GitHub workflows..."
 
+        # Tokenize flags with xargs (honors quoting, e.g. -format '{{json .}}')
+        # without ever re-parsing the value as shell code, so it can't be used
+        # for command injection.
+        flags=()
+        while IFS= read -r flag; do
+          flags+=("$flag")
+        done < <(xargs -n1 <<< "$ACTIONLINT_FLAGS")
+
         # shellcheck disable=SC2086
-        "$ACTIONLINT_EXECUTABLE" $ACTIONLINT_FLAGS $ACTIONLINT_PATHS
+        "$ACTIONLINT_EXECUTABLE" "${flags[@]+"${flags[@]}"}" $ACTIONLINT_PATHS
 
         echo "✅ All workflows verified successfully!"
