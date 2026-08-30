@@ -41,7 +41,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify GitHub Workflows
-        uses: ./
+        uses: $/
   test-inputs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -51,15 +51,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify GitHub Workflows
-        uses: ./
+        uses: $/
         with:
           paths: ".github/workflows/*.yaml"
-          actionlint: "true"
           actionlint-version: "1.7.9"
           actionlint-flags: "-format '{{json .}}'"
           zizmor-version: "1.14.0"
           zizmor-flags: "--no-progress"
-  test-actionlint-enabled:
+  test-actionlint-disabled:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -68,9 +67,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify GitHub Workflows
-        uses: ./
+        uses: $/
         with:
-          actionlint: "true"
+          actionlint: "false"
   test-zizmor-disabled:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -80,7 +79,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify GitHub Workflows
-        uses: ./
+        uses: $/
         with:
           zizmor: "false"
   test-all-disabled:
@@ -92,7 +91,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify GitHub Workflows
-        uses: ./
+        uses: $/
         with:
           actionlint: "false"
           zizmor: "false"
