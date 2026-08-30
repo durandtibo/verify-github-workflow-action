@@ -14,11 +14,12 @@ permissions: {}
 
 jobs:
   pin:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions:
       contents: write # Required to push changes
       pull-requests: write # Required to create pull requests
+      workflows: write # Required to update files under .github/workflows/
     steps:
       - name: Checkout
         uses: actions/checkout@v7
