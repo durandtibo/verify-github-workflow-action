@@ -19,7 +19,6 @@ jobs:
     permissions:
       contents: write # Required to push changes
       pull-requests: write # Required to create pull requests
-      workflows: write # Required to update files under .github/workflows/
     steps:
       - name: Checkout
         uses: actions/checkout@v7
