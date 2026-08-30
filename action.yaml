@@ -18,10 +18,9 @@ inputs:
   actionlint:
     description: >
       Whether to run actionlint, a static checker for GitHub Actions
-      workflow files. Disabled by default because actionlint's upstream
-      maintenance has slowed down; set to "true" to enable it.
+      workflow files. Set to "false" to disable.
     required: false
-    default: "false"
+    default: "true"
 
   actionlint-version:
     description: "Version of actionlint to install (default: latest)"
