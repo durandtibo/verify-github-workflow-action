@@ -14,7 +14,7 @@ help :
 	@echo "  make format           - Run all formatting and linting checks"
 	@echo "  make format-markdown  - Run markdownlint and prettier on Markdown files"
 	@echo "  make format-yaml      - Run yamllint on YAML files"
-	@echo "  make zizmor          - Run zizmor with autofixes on GitHub workflows"
+	@echo "  make zizmor           - Run zizmor with autofixes on GitHub workflows"
 	@echo ""
 	@echo "Formatting tools used:"
 	@echo "  - markdownlint: Validates Markdown files"
