@@ -20,11 +20,8 @@ jobs:
         with:
           node-version: "latest"
 
-      - name: Install markdownlint-cli
-        run: npm install -g markdownlint-cli
-
-      - name: Run markdownlint
-        run: markdownlint -- **/*.md
+      - name: Run format-markdown
+        run: make format-markdown
 
   yaml:
     runs-on: ubuntu-latest
@@ -34,12 +31,5 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v7
 
-      - name: Install yamllint
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y yamllint
-
-      - name: Run yamllint
-        run: |
-          echo "🔍 Running yamllint..."
-          yamllint -f colored .
+      - name: Run format-yaml
+        run: make format-yaml
