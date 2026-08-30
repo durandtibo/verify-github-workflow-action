@@ -54,3 +54,18 @@ jobs:
           version: "1.7.9"
 
           flags: "-format '{{json .}}'"
+          zizmor-version: "1.14.0"
+          zizmor-flags: "--no-progress"
+
+  test-zizmor-disabled:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify GitHub Workflows
+        uses: ./
+        with:
+          zizmor: "false"

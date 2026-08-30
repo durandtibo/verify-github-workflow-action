@@ -1,5 +1,5 @@
 name: "Verify GitHub Workflows"
-description: "Verify the GitHub Workflows using actionlint"
+description: "Verify the GitHub Workflows using actionlint and zizmor"
 
 author: "Thibaut Durand"
 
@@ -22,6 +22,23 @@ inputs:
 
   flags:
     description: "Additional flags to pass to actionlint"
+    required: false
+    default: ""
+
+  zizmor:
+    description: >
+      Whether to also run zizmor, a security-focused static analyzer for
+      GitHub Actions workflows. Set to "false" to disable.
+    required: false
+    default: "true"
+
+  zizmor-version:
+    description: "Version of zizmor to install (default: latest)"
+    required: false
+    default: "latest"
+
+  zizmor-flags:
+    description: "Additional flags to pass to zizmor"
     required: false
     default: ""
 
@@ -86,4 +103,59 @@ runs:
           "$ACTIONLINT_EXECUTABLE" $ACTIONLINT_PATHS
         fi
 
-        echo "✅ All workflows verified successfully!"
+        echo "✅ actionlint checks passed!"
+
+    # Install zizmor using pip (ships prebuilt wheels for Linux, macOS, and Windows)
+    - name: Install zizmor
+      if: inputs.zizmor == 'true'
+      shell: bash
+      env:
+        ZIZMOR_VERSION: ${{ inputs.zizmor-version }}
+      run: |
+        set -euo pipefail
+        echo "📦 Installing zizmor ${ZIZMOR_VERSION}..."
+
+        if [ "$ZIZMOR_VERSION" = "latest" ]; then
+          pip install --disable-pip-version-check zizmor
+        else
+          pip install --disable-pip-version-check "zizmor==${ZIZMOR_VERSION}"
+        fi
+
+        echo "✅ zizmor installed successfully"
+        zizmor --version
+
+    # Run zizmor against workflow files
+    - name: Run zizmor on workflow files
+      if: inputs.zizmor == 'true'
+      shell: bash
+      env:
+        ZIZMOR_FLAGS: ${{ inputs.zizmor-flags }}
+        ZIZMOR_PATHS: ${{ inputs.paths }}
+      run: |
+        set -euo pipefail
+        echo "🔍 Running zizmor on GitHub workflows..."
+
+        # Tokenize flags with xargs (honors quoting) without ever re-parsing
+        # the value as shell code, so it can't be used for command injection.
+        # Skip entirely when empty: GNU xargs (Linux) and BSD xargs (macOS)
+        # disagree on whether an empty string yields zero tokens or one
+        # empty token.
+        flags=()
+        if [ -n "$ZIZMOR_FLAGS" ]; then
+          while IFS= read -r flag; do
+            flags+=("$flag")
+          done < <(xargs -n1 <<< "$ZIZMOR_FLAGS")
+        fi
+
+        # shellcheck disable=SC2086
+        if [ "${#flags[@]}" -gt 0 ]; then
+          zizmor "${flags[@]}" $ZIZMOR_PATHS
+        else
+          zizmor $ZIZMOR_PATHS
+        fi
+
+        echo "✅ zizmor checks passed!"
+
+    - name: All checks passed
+      shell: bash
+      run: echo "✅ All workflows verified successfully!"
