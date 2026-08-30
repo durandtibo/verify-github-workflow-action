@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: write # Required to push changes
       pull-requests: write # Required to create pull requests
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
