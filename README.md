@@ -5,8 +5,8 @@
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://github.com/durandtibo/verify-github-workflow-action/blob/main/LICENSE)
 
 A GitHub Action to verify and validate GitHub workflow files using
-[actionlint](https://github.com/rhysd/actionlint) and
-[zizmor](https://github.com/woodruffw/zizmor).
+[zizmor](https://github.com/woodruffw/zizmor) and, optionally,
+[actionlint](https://github.com/rhysd/actionlint).
 This action helps catch errors and issues in your workflow files early, ensuring they
 follow best practices, are correctly configured, and are free of common security
 pitfalls.
@@ -24,12 +24,14 @@ pitfalls.
 ## Features
 
 - **Automated Validation**: Automatically checks all workflow files in `.github/workflows/`
-- **actionlint Integration**: Uses the latest version of actionlint for comprehensive validation
-- **zizmor Integration**: Runs zizmor to catch security issues such as script injection,
-  overly broad `GITHUB_TOKEN` permissions, and unpinned third-party actions
+- **zizmor Integration**: Runs zizmor (enabled by default) to catch security issues such as
+  script injection, overly broad `GITHUB_TOKEN` permissions, and unpinned third-party actions
+- **actionlint Integration** (opt-in): Runs actionlint for additional syntax and semantic
+  checks. It is disabled by default because its upstream maintenance has slowed down; set
+  `actionlint: "true"` to enable it
 - **Error Detection**: Catches syntax errors, invalid workflow configurations, best
   practice violations, and security issues
-- **Multi-Platform Support**: Works on Ubuntu, macOS, and ARM-based runners
+- **Multi-Platform Support**: Works on Ubuntu, macOS, Windows, and ARM-based runners
 - **Zero Configuration**: Works out of the box with sensible defaults
 
 ## Usage
@@ -71,11 +73,12 @@ steps:
 
 This action performs the following steps:
 
-1. **Install actionlint**: Downloads and installs the latest version of actionlint
-2. **Version Check**: Displays the installed actionlint version for debugging
-3. **Validate**: Runs actionlint on all workflow files in `.github/workflows/`
-4. **Install zizmor**: Installs the latest version of zizmor (unless disabled)
-5. **Security Scan**: Runs zizmor on the same workflow files to catch security issues
+1. **Install zizmor**: Installs the latest version of zizmor (unless disabled)
+2. **Security Scan**: Runs zizmor on all workflow files in `.github/workflows/` to catch
+   security issues
+3. **Install actionlint** (opt-in): Downloads and installs actionlint, only if
+   `actionlint: "true"` is set
+4. **Validate**: Runs actionlint on the same workflow files
 
 The action will fail if any errors are found in your workflow files, helping you catch
 issues before they cause problems in production.
@@ -85,24 +88,35 @@ issues before they cause problems in production.
 
 ### Inputs
 
-| Name             | Description                                     | Default               |
-| ---------------- | ----------------------------------------------- | --------------------- |
-| `paths`          | Paths or glob patterns to workflow files        | `.github/workflows/*` |
-| `version`        | Version of actionlint to install                | `latest`              |
-| `flags`          | Additional flags to pass to actionlint          | `""`                  |
-| `zizmor`         | Whether to also run zizmor (`"true"`/`"false"`) | `true`                |
-| `zizmor-version` | Version of zizmor to install                    | `latest`              |
-| `zizmor-flags`   | Additional flags to pass to zizmor              | `""`                  |
+| Name                 | Description                                    | Default               |
+| -------------------- | ---------------------------------------------- | --------------------- |
+| `paths`              | Paths or glob patterns to workflow files       | `.github/workflows/*` |
+| `zizmor`             | Whether to run zizmor (`"true"`/`"false"`)     | `true`                |
+| `zizmor-version`     | Version of zizmor to install                   | `latest`              |
+| `zizmor-flags`       | Additional flags to pass to zizmor             | `""`                  |
+| `actionlint`         | Whether to run actionlint (`"true"`/`"false"`) | `false`               |
+| `actionlint-version` | Version of actionlint to install               | `latest`              |
+| `actionlint-flags`   | Additional flags to pass to actionlint         | `""`                  |
 
 ### Disabling zizmor
-
-If you only want actionlint's checks, disable zizmor:
 
 ```yaml
 - name: Verify GitHub Workflows
   uses: durandtibo/verify-github-workflow-action@v0.0.3
   with:
     zizmor: "false"
+```
+
+### Enabling actionlint
+
+actionlint is disabled by default because its upstream maintenance has slowed down. If you
+still want its checks (e.g. its shellcheck integration for `run:` steps), enable it:
+
+```yaml
+- name: Verify GitHub Workflows
+  uses: durandtibo/verify-github-workflow-action@v0.0.3
+  with:
+    actionlint: "true"
 ```
 
 ## Examples
