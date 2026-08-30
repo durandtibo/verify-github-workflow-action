@@ -1,0 +1,52 @@
+# Pin action workflow.
+# Pins GitHub Actions in workflow files to immutable commit SHAs using ratchet.
+# https://github.com/sethvargo/ratchet
+# Creates a pull request with the pinned actions after validation.
+
+name: pin-action
+
+on:
+  schedule:
+    - cron: "0 8 * * 3" # Run every Wednesday at 8:00 AM UTC
+  workflow_dispatch: # to trigger manually
+
+permissions: {}
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # Required to push changes
+      pull-requests: write # Required to create pull requests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Always install the latest ratchet release, so the version never goes stale
+      - name: Install ratchet
+        uses: jaxxstorm/action-install-gh-release@v1.10.0
+        with:
+          repo: sethvargo/ratchet
+          platform: linux
+          arch: amd64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Pin all action references to their commit SHA, keeping the version as a comment
+      - name: Pin GitHub Actions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for API quota and auth
+        run: |
+          ratchet pin .github/workflows/*.yaml .github/workflows/*.yml
+
+      # Create a pull request with the pinned actions
+      - uses: peter-evans/create-pull-request@v8
+        if: always()
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: update/pin-action
+          title: Pin GitHub Actions to commit SHA
+          commit-message: "Pin GitHub Actions to commit SHA"
+          body: Pin GitHub Actions to their commit SHA using ratchet.
+          author: ci-bot <${{secrets.CI_BOT_EMAIL}}>
