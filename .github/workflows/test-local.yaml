@@ -65,7 +65,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify GitHub Workflows
-        uses: ./
+        uses: $/
         with:
           actionlint: "true"
   test-zizmor-disabled:
@@ -89,7 +89,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify GitHub Workflows
-        uses: ./
+        uses: $/
         with:
           actionlint: "false"
           zizmor: "false"
