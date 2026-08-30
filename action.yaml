@@ -15,19 +15,27 @@ inputs:
     required: false
     default: ".github/workflows/*"
 
-  version:
+  actionlint:
+    description: >
+      Whether to run actionlint, a static checker for GitHub Actions
+      workflow files. Disabled by default because actionlint's upstream
+      maintenance has slowed down; set to "true" to enable it.
+    required: false
+    default: "false"
+
+  actionlint-version:
     description: "Version of actionlint to install (default: latest)"
     required: false
     default: "latest"
 
-  flags:
+  actionlint-flags:
     description: "Additional flags to pass to actionlint"
     required: false
     default: ""
 
   zizmor:
     description: >
-      Whether to also run zizmor, a security-focused static analyzer for
+      Whether to run zizmor, a security-focused static analyzer for
       GitHub Actions workflows. Set to "false" to disable.
     required: false
     default: "true"
@@ -48,9 +56,10 @@ runs:
     # Download and install actionlint using the official installer script
     - name: Install actionlint
       id: install
+      if: inputs.actionlint == 'true'
       shell: bash
       env:
-        ACTIONLINT_VERSION: ${{ inputs.version }}
+        ACTIONLINT_VERSION: ${{ inputs.actionlint-version }}
       run: |
         set -euo pipefail
         echo "📦 Installing actionlint ${ACTIONLINT_VERSION}..."
@@ -60,6 +69,7 @@ runs:
 
     # Verify that actionlint was installed correctly
     - name: Verify actionlint installation
+      if: inputs.actionlint == 'true'
       shell: bash
       env:
         ACTIONLINT_EXECUTABLE: ${{ steps.install.outputs.executable }}
@@ -75,10 +85,11 @@ runs:
 
     # Run actionlint against workflow files
     - name: Run actionlint on workflow files
+      if: inputs.actionlint == 'true'
       shell: bash
       env:
         ACTIONLINT_EXECUTABLE: ${{ steps.install.outputs.executable }}
-        ACTIONLINT_FLAGS: ${{ inputs.flags }}
+        ACTIONLINT_FLAGS: ${{ inputs.actionlint-flags }}
         ACTIONLINT_PATHS: ${{ inputs.paths }}
       run: |
         set -euo pipefail
