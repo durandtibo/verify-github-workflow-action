@@ -14,14 +14,22 @@ permissions: {}
 
 jobs:
   pin:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions:
-      contents: write # Required to push changes
-      pull-requests: write # Required to create pull requests
+      contents: read # actions/checkout only needs read; the app token grants write
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.TIBOT_APP_ID }}
+          private-key: ${{ secrets.TIBOT_APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       # Always install the latest ratchet release, so the version never goes stale
       - name: Install ratchet
@@ -31,20 +39,24 @@ jobs:
           platform: linux
           arch: amd64
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       # Pin all action references to their commit SHA, keeping the version as a comment
       - name: Pin GitHub Actions
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # for API quota and auth
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }} # for API quota and auth
         run: |
           ratchet pin .github/workflows/*.yaml .github/workflows/*.yml
+
+      # Reformat the pinned files so ratchet's output matches repo style
+      - name: Format YAML
+        run: npx --yes prettier --write ".github/workflows/*.yaml" ".github/workflows/*.yml"
 
       # Create a pull request with the pinned actions
       - uses: peter-evans/create-pull-request@v8
         if: always()
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           branch: update/pin-action
           title: Pin GitHub Actions to commit SHA
           commit-message: "Pin GitHub Actions to commit SHA"
