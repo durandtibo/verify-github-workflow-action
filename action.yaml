@@ -40,7 +40,7 @@ inputs:
   zizmor-flags:
     description: "Additional flags to pass to zizmor"
     required: false
-    default: ""
+    default: "--persona=regular"
 
 runs:
   using: "composite"
