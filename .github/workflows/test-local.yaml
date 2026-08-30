@@ -51,10 +51,23 @@ jobs:
         uses: ./
         with:
           paths: ".github/workflows/*.yaml"
-          version: "1.7.9"
-          flags: "-format '{{json .}}'"
+          actionlint: "true"
+          actionlint-version: "1.7.9"
+          actionlint-flags: "-format '{{json .}}'"
           zizmor-version: "1.14.0"
           zizmor-flags: "--no-progress"
+  test-actionlint-enabled:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify GitHub Workflows
+        uses: ./
+        with:
+          actionlint: "true"
   test-zizmor-disabled:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -66,4 +79,17 @@ jobs:
       - name: Verify GitHub Workflows
         uses: ./
         with:
+          zizmor: "false"
+  test-all-disabled:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify GitHub Workflows
+        uses: ./
+        with:
+          actionlint: "false"
           zizmor: "false"
