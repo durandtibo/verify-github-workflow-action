@@ -13,18 +13,17 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # ratchet:actions/setup-node@v7
         with:
           node-version: "latest"
 
-      - name: Install markdownlint-cli
-        run: npm install -g markdownlint-cli
-
-      - name: Run markdownlint
-        run: markdownlint -- **/*.md
+      - name: Run format-markdown
+        run: make format-markdown
 
   yaml:
     runs-on: ubuntu-latest
@@ -32,14 +31,9 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
 
-      - name: Install yamllint
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y yamllint
-
-      - name: Run yamllint
-        run: |
-          echo "🔍 Running yamllint..."
-          yamllint -f colored .
+      - name: Run format-yaml
+        run: make format-yaml
