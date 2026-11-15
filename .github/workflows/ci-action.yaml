@@ -355,3 +355,367 @@ jobs:
         uses: ./
         with:
           github-token: ${{ github.token }}
+
+  # Flags are tokenized with xargs: quoting is honored (a flag with a space stays one token),
+  # flags really reach the tools, an unknown flag fails, and shell syntax in the flags is
+  # never executed. Runs on every OS because xargs differs between GNU and BSD.
+  test-flags-os:
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      max-parallel: 8
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(inputs.test-matrix).os_matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Positive control: the tools install and accept the valid fixture
+      - name: Verify the valid fixture
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+
+      # The quoted pattern contains a space: split in two tokens it would make actionlint
+      # fail (a stray argument), so success proves the quoting is honored and the flag applied
+      - name: actionlint ignores the error through a quoted flag
+        uses: ./
+        with:
+          paths: tests/fixtures/actionlint-error.yaml
+          zizmor: "false"
+          actionlint-flags: "-ignore '.+ .+'"
+
+      # Only findings of critical severity fail: the fixture has none. The flag is given
+      # with a space between name and value.
+      - name: zizmor honors a flag with a separate value
+        uses: ./
+        with:
+          paths: tests/fixtures/zizmor-error.yaml
+          actionlint: "false"
+          zizmor-flags: "--min-severity critical"
+
+      # A user-chosen format given as two tokens must not get --format=github added
+      - name: zizmor accepts a separate --format value
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          actionlint: "false"
+          zizmor-flags: "--format plain"
+
+      - name: Unknown actionlint flag
+        id: bad-actionlint-flag
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          zizmor: "false"
+          actionlint-flags: "--definitely-not-a-flag"
+
+      - name: Unknown zizmor flag
+        id: bad-zizmor-flag
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          actionlint: "false"
+          zizmor-flags: "--definitely-not-a-flag"
+
+      # Shell syntax in the flags is data, never code. The runs may fail (junk arguments),
+      # only the absence of side effects matters.
+      - name: Injection through actionlint-flags
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          zizmor: "false"
+          actionlint-flags: "$(touch pwned-actionlint) `touch pwned-actionlint` ; touch pwned-actionlint"
+
+      - name: Injection through zizmor-flags
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          actionlint: "false"
+          zizmor-flags: "$(touch pwned-zizmor) `touch pwned-zizmor` ; touch pwned-zizmor"
+
+      - name: Check the outcomes and that nothing was executed
+        env:
+          BAD_ACTIONLINT_FLAG: ${{ steps.bad-actionlint-flag.outcome }}
+          BAD_ZIZMOR_FLAG: ${{ steps.bad-zizmor-flag.outcome }}
+        run: |
+          set -euo pipefail
+          echo "actionlint bad flag: $BAD_ACTIONLINT_FLAG, zizmor bad flag: $BAD_ZIZMOR_FLAG"
+          [ "$BAD_ACTIONLINT_FLAG" = "failure" ]
+          [ "$BAD_ZIZMOR_FLAG" = "failure" ]
+          [ ! -e pwned-actionlint ]
+          [ ! -e pwned-zizmor ]
+          status="$(git status --porcelain)"
+          echo "$status"
+          [ -z "$status" ]
+
+  # Paths edge cases: a missing file fails, glob characters are not expanded, blank lines,
+  # surrounding blank lines and several files are fine. Each negative case is preceded by
+  # the positive control of the job.
+  test-paths-edge-cases:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Positive control: the tools install and accept the valid fixture
+      - name: Verify the valid fixture
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+
+      # Blank lines are skipped, not passed as empty arguments
+      - name: Blank lines in paths
+        uses: ./
+        with:
+          paths: |
+
+            tests/fixtures/valid/ok.yaml
+
+            tests/fixtures/dir with space/ok.yaml
+
+      - name: Missing file
+        id: missing
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/does-not-exist.yaml
+
+      # The glob would match the valid fixture: if it were expanded the run would succeed
+      - name: Glob is not expanded
+        id: glob
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/*.yaml
+
+      # A valid path next to an invalid one: the whole run fails
+      - name: One bad path among valid ones
+        id: mixed
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: |
+            tests/fixtures/valid/ok.yaml
+            tests/fixtures/actionlint-error.yaml
+
+      - name: Check the outcomes
+        env:
+          MISSING: ${{ steps.missing.outcome }}
+          GLOB: ${{ steps.glob.outcome }}
+          MIXED: ${{ steps.mixed.outcome }}
+        run: |
+          set -euo pipefail
+          echo "missing=$MISSING glob=$GLOB mixed=$MIXED"
+          [ "$MISSING" = "failure" ]
+          [ "$GLOB" = "failure" ]
+          [ "$MIXED" = "failure" ]
+
+  # Without `paths` the action verifies .github/workflows. Bad workflows are copied there
+  # (the checkout of this job only) to prove that the default discovery finds and rejects
+  # them, for each tool separately.
+  test-default-discovery:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Positive control: the repository workflows are valid
+      - name: Verify the default directory
+        uses: ./
+
+      - name: Add an actionlint error to the default directory
+        run: |
+          set -euo pipefail
+          cp tests/fixtures/actionlint-error.yaml .github/workflows/zz-actionlint-error.yaml
+
+      - name: Default discovery rejects the actionlint error
+        id: actionlint-found
+        continue-on-error: true
+        uses: ./
+
+      - name: Default discovery ignores it when actionlint is disabled
+        id: actionlint-disabled
+        continue-on-error: true
+        uses: ./
+        with:
+          actionlint: "false"
+
+      - name: Replace it by a zizmor error
+        run: |
+          set -euo pipefail
+          rm .github/workflows/zz-actionlint-error.yaml
+          cp tests/fixtures/zizmor-error.yaml .github/workflows/zz-zizmor-error.yaml
+
+      - name: Default discovery rejects the zizmor error
+        id: zizmor-found
+        continue-on-error: true
+        uses: ./
+
+      - name: Default discovery ignores it when zizmor is disabled
+        id: zizmor-disabled
+        continue-on-error: true
+        uses: ./
+        with:
+          zizmor: "false"
+
+      - name: Check the outcomes
+        env:
+          ACTIONLINT_FOUND: ${{ steps.actionlint-found.outcome }}
+          ACTIONLINT_DISABLED: ${{ steps.actionlint-disabled.outcome }}
+          ZIZMOR_FOUND: ${{ steps.zizmor-found.outcome }}
+          ZIZMOR_DISABLED: ${{ steps.zizmor-disabled.outcome }}
+        run: |
+          set -euo pipefail
+          echo "$ACTIONLINT_FOUND $ACTIONLINT_DISABLED $ZIZMOR_FOUND $ZIZMOR_DISABLED"
+          [ "$ACTIONLINT_FOUND" = "failure" ]
+          [ "$ACTIONLINT_DISABLED" = "success" ]
+          [ "$ZIZMOR_FOUND" = "failure" ]
+          [ "$ZIZMOR_DISABLED" = "success" ]
+
+  # The requested versions are the installed ones, and an unknown version fails.
+  test-versions:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # An exact older actionlint release, different from the default in action.yaml
+      - name: Verify with an exact actionlint version
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          zizmor: "false"
+          actionlint-version: "1.7.11"
+
+      - name: Check the installed actionlint version
+        run: |
+          set -euo pipefail
+          version="$("$RUNNER_TEMP/verify-workflows/bin/actionlint" -version | head -n 1)"
+          echo "$version"
+          [ "$version" = "1.7.11" ]
+
+      - name: Unknown actionlint version
+        id: bad-actionlint-version
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          zizmor: "false"
+          actionlint-version: "0.0.0"
+
+      - name: Unknown zizmor version
+        id: bad-zizmor-version
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          actionlint: "false"
+          zizmor-version: "0.0.0"
+
+      - name: Check the outcomes
+        env:
+          BAD_ACTIONLINT: ${{ steps.bad-actionlint-version.outcome }}
+          BAD_ZIZMOR: ${{ steps.bad-zizmor-version.outcome }}
+        run: |
+          set -euo pipefail
+          echo "actionlint=$BAD_ACTIONLINT zizmor=$BAD_ZIZMOR"
+          [ "$BAD_ACTIONLINT" = "failure" ]
+          [ "$BAD_ZIZMOR" = "failure" ]
+
+  # A disabled tool never starts, and a rejected input skips both tools (Prepare fails).
+  # Uses the ran-<tool> markers, removed before each run.
+  test-skipped-tools:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Positive control: both tools run on the valid fixture and leave their markers
+      - name: Verify the valid fixture
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+
+      - name: Check both markers exist
+        run: |
+          set -euo pipefail
+          [ -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
+          [ -f "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
+
+      - name: Remove the markers
+        run: |
+          set -euo pipefail
+          rm -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" "$RUNNER_TEMP/verify-workflows/ran-zizmor"
+
+      - name: Verify with actionlint disabled
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          actionlint: "false"
+
+      - name: Check only zizmor ran
+        run: |
+          set -euo pipefail
+          [ ! -e "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
+          [ -f "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
+          rm -f "$RUNNER_TEMP/verify-workflows/ran-zizmor"
+
+      - name: Verify with zizmor disabled
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          zizmor: "false"
+
+      - name: Check only actionlint ran
+        run: |
+          set -euo pipefail
+          [ -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
+          [ ! -e "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
+          rm -f "$RUNNER_TEMP/verify-workflows/ran-actionlint"
+
+      - name: Verify with an invalid boolean
+        id: invalid
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+          zizmor: "yes"
+
+      - name: Check the action failed and no tool ran
+        env:
+          OUTCOME: ${{ steps.invalid.outcome }}
+        run: |
+          set -euo pipefail
+          [ "$OUTCOME" = "failure" ]
+          [ ! -e "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
+          [ ! -e "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
