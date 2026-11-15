@@ -80,7 +80,8 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
     `durandtibo/workflow-config-action` once and exposes it as `os_matrix` in the `test_matrix`
     JSON output; callers pass it down to the test workflows. Never
     hardcode the OS list.
-  - `ci-format.yaml`: markdownlint/prettier and yamllint checks.
+  - `ci-format.yaml`: read-only markdownlint and yamllint checks (`make lint-markdown`,
+    `make lint-yaml`).
   - `ci-action.yaml`: runs the action from this checkout (the version not released yet) on the
     full OS matrix and with different input combinations (custom versions and flags, `latest`,
     `github-token`, paths, actionlint disabled, zizmor disabled, both disabled). It also runs the
