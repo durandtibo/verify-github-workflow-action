@@ -52,7 +52,8 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
 - Code in `run:` blocks must stay clean under `shellcheck`; justify any `# shellcheck disable`.
 - Structure: three steps (`Prepare`, `actionlint`, `zizmor`); each tool step installs and runs.
   Keep it that way.
-- The tool steps use `if: ${{ !cancelled() && steps.prepare.outcome == 'success' && inputs.<tool> == 'true' }}`,
+- The tool steps use
+  `if: ${{ !cancelled() && steps.prepare.outcome == 'success' && inputs.<tool> == 'true' }}`,
   so both tools run even when one fails and one run reports all problems. A failed `Prepare`
   skips both. Keep the two conditions symmetric.
 - The actionlint installer is downloaded to a file (`curl -fsSL -o`) and then run, never run

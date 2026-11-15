@@ -58,48 +58,55 @@ is from reading the code.
 
 ### Violations of the properties
 
-4. **P8: the first failing tool hides the second.** The `zizmor` step has the default
-   `if: success()`. When actionlint reports a finding, zizmor never runs, so the user
-   fixes one tool, pushes, and only then sees the other tool's findings. Two CI
-   round trips instead of one, for a slow-feedback gate.
-5. **P11: negative tests can pass for the wrong reason.** `test-failure-os` and
-   `test-fixtures` only check that the outcome is `failure`. A failed install, a missing
-   `pipx` or a typo would also yield `failure` and the test stays green. Only the
-   positive `test` job proves the install works, and nothing ties the two together on
-   one OS. The action should make the cause assertable.
-6. **P5: not all downloads are verified, and some references still move.**
-   - The actionlint archive is not checksum-verified (documented in `SECURITY.md`).
-     `actionlint_<v>_checksums.txt` is published next to every archive, so the check is
-     cheap now that versions are pinned.
-   - `pipx run zizmor==X` pins zizmor but not its transitive dependencies, and has no
-     hashes.
-   - `ci-format.yaml` uses `node-version: "latest"` and `bot-pin-action.yaml` installs
-     "the latest ratchet". These are repo tooling, not the shipped action, so they are
-     lower risk, but they make CI results time-dependent.
-   - The `Makefile` `zizmor` target still runs an unpinned `pip3 install --user zizmor`
-     when zizmor is missing, which also fails on PEP 668 Pythons. `make install-zizmor`
-     (in `.make/actions.mk`) now exists and is the supported way to install it.
-7. **P11/P12: documentation promises a release that does not exist.** `README.md` has a
-   "Migration to v0.1.0" section and `SECURITY.md` lists `0.1.x` as supported, while the
-   latest tag is `v0.0.3` and the README examples pin `v0.0.3`. This is accepted by
-   `CLAUDE.md` (README examples change only on release), but the migration section needs a
-   visible "unreleased" marker so users on `v0.0.3` do not read it as current behaviour.
+4\. **P8: the first failing tool hides the second.** The `zizmor` step has the default
+`if: success()`. When actionlint reports a finding, zizmor never runs, so the user
+fixes one tool, pushes, and only then sees the other tool's findings. Two CI
+round trips instead of one, for a slow-feedback gate.
+
+5\. **P11: negative tests can pass for the wrong reason.** `test-failure-os` and
+`test-fixtures` only check that the outcome is `failure`. A failed install, a missing
+`pipx` or a typo would also yield `failure` and the test stays green. Only the
+positive `test` job proves the install works, and nothing ties the two together on
+one OS. The action should make the cause assertable.
+
+6\. **P5: not all downloads are verified, and some references still move.**
+
+- The actionlint archive is not checksum-verified (documented in `SECURITY.md`).
+  `actionlint_<v>_checksums.txt` is published next to every archive, so the check is
+  cheap now that versions are pinned.
+- `pipx run zizmor==X` pins zizmor but not its transitive dependencies, and has no
+  hashes.
+- `ci-format.yaml` uses `node-version: "latest"` and `bot-pin-action.yaml` installs
+  "the latest ratchet". These are repo tooling, not the shipped action, so they are
+  lower risk, but they make CI results time-dependent.
+- The `Makefile` `zizmor` target still runs an unpinned `pip3 install --user zizmor`
+  when zizmor is missing, which also fails on PEP 668 Pythons. `make install-zizmor`
+  (in `.make/actions.mk`) now exists and is the supported way to install it.
+
+7\. **P11/P12: documentation promises a release that does not exist.** `README.md` has a
+"Migration to v0.1.0" section and `SECURITY.md` lists `0.1.x` as supported, while the
+latest tag is `v0.0.3` and the README examples pin `v0.0.3`. This is accepted by
+`CLAUDE.md` (README examples change only on release), but the migration section needs a
+visible "unreleased" marker so users on `v0.0.3` do not read it as current behaviour.
 
 ### Smaller points
 
-8. `README.md` and `action.yaml` link `woodruffw/zizmor`. The project moved to
-   `zizmorcore/zizmor` (the GitHub API resolves it). Update the links.
-9. The two flag/path parsing blocks are duplicated between the `actionlint` and `zizmor`
-   steps (about 15 lines each). This is inherent to composite actions without scripts
-   (P2) and is small. Keep it, but keep both blocks byte-identical so a diff shows any
-   divergence.
-10. `README.md` states `bash` as a requirement only; the actionlint installer also needs
-    `curl` and `tar` (`unzip` on Windows). They are present on every hosted runner;
-    self-hosted runners need them. One line in Requirements.
-11. `action.yaml` description fields use folded `>` with long lines. Fine, but the
-    `paths` description should say explicitly that glob patterns are **not** expanded
-    (the README does, the input does not), since the input description is what
-    the Marketplace shows.
+8\. `README.md` and `action.yaml` link `woodruffw/zizmor`. The project moved to
+`zizmorcore/zizmor` (the GitHub API resolves it). Update the links.
+
+9\. The two flag/path parsing blocks are duplicated between the `actionlint` and `zizmor`
+steps (about 15 lines each). This is inherent to composite actions without scripts
+(P2) and is small. Keep it, but keep both blocks byte-identical so a diff shows any
+divergence.
+
+10\. `README.md` states `bash` as a requirement only; the actionlint installer also needs
+`curl` and `tar` (`unzip` on Windows). They are present on every hosted runner;
+self-hosted runners need them. One line in Requirements.
+
+11\. `action.yaml` description fields use folded `>` with long lines. Fine, but the
+`paths` description should say explicitly that glob patterns are **not** expanded
+(the README does, the input does not), since the input description is what
+the Marketplace shows.
 
 ## 3. Target design
 
