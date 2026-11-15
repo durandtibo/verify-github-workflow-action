@@ -390,14 +390,14 @@ jobs:
           zizmor: "false"
           actionlint-flags: "-ignore '.+ .+'"
 
-      # Only findings of critical severity fail: the fixture has none. The flag is given
-      # with a space between name and value.
+      # The flag is given with a space between name and value: a mishandled value would be an
+      # invalid argument and fail the run.
       - name: zizmor honors a flag with a separate value
         uses: ./
         with:
-          paths: tests/fixtures/zizmor-error.yaml
+          paths: tests/fixtures/valid/ok.yaml
           actionlint: "false"
-          zizmor-flags: "--min-severity critical"
+          zizmor-flags: "--min-severity high"
 
       # A user-chosen format given as two tokens must not get --format=github added
       - name: zizmor accepts a separate --format value

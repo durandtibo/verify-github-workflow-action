@@ -148,6 +148,13 @@ runs:
         spec="zizmor"
         if [ "$ZIZMOR_VERSION" != "latest" ]; then spec="zizmor==${ZIZMOR_VERSION}"; fi
 
+        # Recent zizmor releases need Python >= 3.11, which some runners (ubuntu-22.04) lack
+        # as the default: use the newest one found, else let pipx download one
+        pipx_python=(--python 3.13 --fetch-missing-python)
+        for v in 3.13 3.12 3.11; do
+          if command -v "python${v}" > /dev/null; then pipx_python=(--python "python${v}"); break; fi
+        done
+
         flags=()
         if [ -n "$ZIZMOR_FLAGS" ]; then
           while IFS= read -r flag; do flags+=("$flag"); done < <(xargs -n1 <<< "$ZIZMOR_FLAGS")
@@ -173,4 +180,4 @@ runs:
         # Marker for the tests: zizmor was started
         touch "$RUNNER_TEMP/verify-workflows/ran-zizmor"
 
-        pipx run --spec "$spec" zizmor ${flags[@]+"${flags[@]}"} "${targets[@]}"
+        pipx run "${pipx_python[@]}" --spec "$spec" zizmor ${flags[@]+"${flags[@]}"} "${targets[@]}"
