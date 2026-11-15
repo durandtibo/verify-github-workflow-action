@@ -15,26 +15,25 @@ pitfalls.
 
 - [Features](#features)
 - [Usage](#usage)
-- [How It Works](#how-it-works)
-- [Examples](#examples)
+- [Inputs](#inputs)
+- [Recipes](#recipes)
 - [Requirements](#requirements)
+- [Migration to v0.1.0](#migration-to-v010)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Features
 
-- **Automated Validation**: Automatically checks all workflow files in `.github/workflows/`
-- **actionlint Integration**: Uses a pinned version of actionlint (`latest` is accepted) for comprehensive validation
-- **zizmor Integration**: Runs zizmor to catch security issues such as script injection,
-  overly broad `GITHUB_TOKEN` permissions, and unpinned third-party actions
-- **Error Detection**: Catches syntax errors, invalid workflow configurations, best
-  practice violations, and security issues
-- **Multi-Platform Support**: Works on Ubuntu, macOS, Windows, and ARM-based runners
-- **Zero Configuration**: Works out of the box with sensible defaults
+- **Two checkers**: actionlint (syntax and correctness) and zizmor (security), each one
+  can be disabled
+- **Reproducible**: tool versions are pinned by default, and nothing is executed from a
+  moving ref (see [SECURITY.md](SECURITY.md))
+- **Annotations**: zizmor findings show up inline on pull requests
+- **Clean**: tools are installed outside your checkout, which is never modified
+- **Portable**: Linux, macOS and Windows runners (x64 and ARM)
+- **Zero configuration**: works on a checked-out repository with no input
 
 ## Usage
-
-To use this action in your workflow, add the following step to your workflow file:
 
 ```yaml
 name: Verify Workflows
@@ -42,142 +41,103 @@ name: Verify Workflows
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
+
+permissions: {}
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.3
+        uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
 ```
 
-### Minimal Example
+The action fails if actionlint or zizmor report a finding, if an input is invalid, or if a
+tool cannot be installed.
 
-```yaml
-steps:
-  - name: Checkout
-    uses: actions/checkout@v6
-
-  - name: Verify GitHub Workflows
-    uses: durandtibo/verify-github-workflow-action@v0.0.3
-```
-
-## How It Works
-
-This action performs the following steps:
-
-1. **Install actionlint**: Downloads and installs actionlint (pinned version by default; unless
-   disabled)
-2. **Validate**: Runs actionlint on all workflow files in `.github/workflows/`
-3. **Install zizmor**: Installs zizmor with pipx (pinned version by default; unless disabled)
-4. **Security Scan**: Runs zizmor on the same workflow files to catch security issues
-
-The action will fail if any errors are found in your workflow files, helping you catch
-issues before they cause problems in production.
-
-**Note**: The action requires your repository code to be checked out first using
-`actions/checkout` before it can validate the workflow files.
-
-### Inputs
+## Inputs
 
 | Name                 | Description                                                                                        | Default  |
 | -------------------- | -------------------------------------------------------------------------------------------------- | -------- |
 | `paths`              | Newline-separated workflow files (no glob expansion; default: all of `.github/workflows`)          | `""`     |
-| `actionlint`         | Whether to run actionlint (`"true"`/`"false"`)                                                     | `true`   |
-| `actionlint-version` | Version of actionlint to install                                                                   | `1.7.12` |
+| `actionlint`         | Whether to run actionlint (`"true"`/`"false"`, anything else fails)                                | `"true"` |
+| `actionlint-version` | Version of actionlint to install (`x.y.z` or `latest`)                                             | `1.7.12` |
 | `actionlint-flags`   | Additional flags to pass to actionlint                                                             | `""`     |
-| `zizmor`             | Whether to run zizmor (`"true"`/`"false"`)                                                         | `true`   |
-| `zizmor-version`     | Version of zizmor to install                                                                       | `1.32.0` |
+| `zizmor`             | Whether to run zizmor (`"true"`/`"false"`, anything else fails)                                    | `"true"` |
+| `zizmor-version`     | Version of zizmor to install (`x.y.z` or `latest`)                                                 | `1.32.0` |
 | `zizmor-flags`       | Additional flags to pass to zizmor (`--format=github` is added unless you pass `--format`)         | `""`     |
 | `github-token`       | Token for zizmor online audits (`${{ github.token }}`; needs `contents: read` and `actions: read`) | `""`     |
 
-### Disabling actionlint or zizmor
+The action has no outputs: the status of the step is the result. Flags are split like
+shell words (quotes are honored) but are never evaluated as shell code.
 
-Each tool can be disabled independently:
+## Recipes
+
+Disable a tool (disabling both is a successful no-op):
 
 ```yaml
-- name: Verify GitHub Workflows
-  uses: durandtibo/verify-github-workflow-action@v0.0.3
+- uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
   with:
-    actionlint: "false"
     zizmor: "false"
 ```
 
-## Examples
-
-### Basic CI Pipeline
+Check specific files (one per line, spaces are fine):
 
 ```yaml
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:
-  verify-workflows:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.3
+- uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
+  with:
+    paths: |
+      .github/workflows/ci.yaml
+      .github/workflows/release.yaml
 ```
 
-### Multiple OS Testing
+Pin the tool versions, or follow the latest ones:
 
 ```yaml
-name: Multi-OS Verification
-
-on: [push, pull_request]
-
-jobs:
-  verify:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.3
+- uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
+  with:
+    actionlint-version: "1.7.12"
+    zizmor-version: latest
 ```
 
-### Scheduled Workflow Verification
+Enable the zizmor online audits (for example known vulnerable actions or impostor commits):
 
 ```yaml
-name: Weekly Workflow Check
-
-on:
-  schedule:
-    - cron: "0 0 * * 0" # Every Sunday at midnight
-
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Verify GitHub Workflows
-        uses: durandtibo/verify-github-workflow-action@v0.0.3
+permissions:
+  contents: read
+  actions: read
+steps:
+  - uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
+    with:
+      github-token: ${{ github.token }}
 ```
 
 ## Requirements
 
-- **The action requires your repository code to be checked out first using
-  `actions/checkout` before running the verification**
-- Your repository must contain workflow files in `.github/workflows/` directory
-- The runner must have bash available (standard on all GitHub-hosted runners)
+- Your repository must be checked out first (`actions/checkout`)
+- `bash` (standard on all GitHub-hosted runners)
+- Python with `pipx` to run zizmor (both are preinstalled on GitHub-hosted runners)
+
+## Migration to v0.1.0
+
+- `paths` now defaults to `""` (the workflows in `.github/workflows`) instead of
+  `.github/workflows/*`. It is newline-separated and no longer expanded as a glob: list
+  the files explicitly.
+- `actionlint-version` and `zizmor-version` default to pinned versions instead of
+  `latest`. Set them to `latest` to keep the previous behaviour.
+- zizmor prints GitHub annotations (`--format=github`) unless you pass `--format`.
+- `actionlint` and `zizmor` must be `"true"` or `"false"`. Other values fail instead of
+  silently disabling the tool.
+- zizmor is run with `pipx` instead of being installed with `pip`.
+- New input: `github-token`.
 
 ## Contributing
 
