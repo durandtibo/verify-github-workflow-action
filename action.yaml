@@ -59,7 +59,7 @@ inputs:
   github-token:
     description: >
       GitHub token passed to zizmor as `GH_TOKEN` to enable its online audits. Optional.
-      `${{ github.token }}` is enough (needs `contents: read` and `actions: read`).
+      The workflow token (`github.token`) is enough (needs `contents: read` and `actions: read`).
     required: false
     default: ""
 
