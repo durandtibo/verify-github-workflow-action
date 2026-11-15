@@ -34,6 +34,9 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
 - Releases are immutable exact version tags (`v0.0.3`, ...). Do not create or move floating tags
   (`v1`, `latest`) and do not document them as an option. Update the version in `README.md`
   examples only as part of a release.
+- Release checklist: bump the default `actionlint-version` and `zizmor-version` in `action.yaml`
+  and `README.md` (and the pinned installer SHA if actionlint changes), tag, then update the
+  pinned version in `README.md`, `ci-verify-workflows.yaml` and `nightly-test-released.yaml`.
 
 ## Action rules (`action.yaml`)
 
@@ -47,19 +50,33 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
   an empty flags value must produce zero arguments.
 - Each step has a `name:` and a comment saying what it does.
 - Code in `run:` blocks must stay clean under `shellcheck`; justify any `# shellcheck disable`.
+- Structure: three steps (`Prepare`, `actionlint`, `zizmor`); each tool step installs and runs.
+  Keep it that way.
+- Tools are installed under `RUNNER_TEMP`, never in the workspace. The action must leave
+  `git status` clean.
+- `paths` is newline-separated and read line by line, never word-split or globbed. Use the
+  `${arr[@]+"${arr[@]}"}` form for possibly empty arrays (bash 3.2 on macOS), and no bash 4
+  syntax (`${var^^}`, `${!var}`, `mapfile`, ...).
+- Never execute anything from a moving ref: the actionlint installer is pinned to a commit SHA,
+  and the default tool versions are exact. Releasing bumps them (see below).
+- `github-token` reaches zizmor as `GH_TOKEN` through `env:`; unset it when empty. zizmor gets
+  `--format=github` unless the flags contain `--format`.
+- `actionlint` and `zizmor` accept only `true` or `false`; anything else fails.
 
 ## Workflow structure (`.github/workflows/`)
 
 - Files are prefixed by their role: `ci-`, `nightly-`, `lib-`, `bot-`, `security-`.
 - `ci.yaml`: entry point for pull requests, pushes to `main`, a nightly schedule and manual runs. It
   holds no steps, only jobs that call the reusable workflows below. It tests the current checkout.
-  - `lib-get-test-matrix.yaml`: loads the OS matrix (`os_all`) from
-    `durandtibo/workflow-config-action` once; callers pass it down to the test workflows. Never
+  - `lib-get-test-matrix.yaml`: loads the OS list (`os_all`) from
+    `durandtibo/workflow-config-action` once and exposes it as `os_matrix` in the `test_matrix`
+    JSON output; callers pass it down to the test workflows. Never
     hardcode the OS list.
   - `ci-format.yaml`: markdownlint/prettier and yamllint checks.
   - `ci-action.yaml`: runs the action from this checkout (the version not released yet) on the
-    full OS matrix and with different input combinations (custom versions and flags, actionlint
-    disabled, zizmor disabled, both disabled).
+    full OS matrix and with different input combinations (custom versions and flags, `latest`,
+    `github-token`, paths, actionlint disabled, zizmor disabled, both disabled). It also runs the
+    action on the invalid fixtures and asserts that it fails (`test-fixtures`, `test-failure-os`).
 - `ci-verify-workflows.yaml`: verifies this repo's workflows with the latest released action. It
   has its own triggers and is deliberately not called from `ci.yaml`.
 - `nightly.yaml`: scheduled entry point that tests the latest released action.
@@ -85,6 +102,12 @@ Conventions:
 
 ## Tests
 
+- Fixtures live in `tests/fixtures/` (outside `.github/workflows`, so they are never run or
+  self-checked): `valid/ok.yaml`, `actionlint-error.yaml` (rejected by actionlint only),
+  `zizmor-error.yaml` (rejected by zizmor only), `dir with space/ok.yaml`. Keep each bad fixture
+  failing for exactly one tool.
+- Failure paths are tested with `continue-on-error: true`, an `id`, and a step asserting
+  `steps.<id>.outcome`.
 - Every new or changed input needs a job in `ci-action.yaml` exercising it (including the
   disabled and default paths). Mirror the relevant case in `nightly-test-released.yaml` once released.
 - Keep the OS matrix in both test workflows identical (it comes from `lib-get-test-matrix.yaml`).

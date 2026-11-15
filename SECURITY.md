@@ -7,6 +7,7 @@ security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.1.x   | :white_check_mark: |
 | 0.0.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
@@ -53,7 +54,7 @@ After submitting a vulnerability report:
 
 When using this action, we recommend:
 
-1. **Pin to Specific Versions**: Use a specific version tag (e.g., `@v0.0.1`) instead of
+1. **Pin to Specific Versions**: Use a specific version tag (e.g., `@v0.1.0`), ideally its commit SHA, instead of
    `@main` to avoid unexpected changes.
 
 2. **Review Changes**: When updating to a new version, review the changes in the release
@@ -72,14 +73,29 @@ When using this action, we recommend:
 
 This action includes the following security measures:
 
-- **No External Network Calls**: Apart from downloading actionlint from the official
-  repository, the action makes no external network calls.
+- **Pinned installer**: actionlint is installed with the official download script of the
+  actionlint repository, pinned to a release commit SHA (never `main`). The script
+  downloads the release archive over HTTPS from GitHub releases.
 
-- **Read-Only by Default**: The action only reads workflow files and does not modify
-  any files in your repository.
+- **Pinned tool versions**: the default versions of actionlint and zizmor are exact
+  versions, bumped on each release of this action. `latest` is opt-in.
 
-- **Minimal Dependencies**: The action has minimal dependencies, reducing the attack
-  surface.
+- **Isolated zizmor install**: zizmor is run with `pipx run`, which uses an isolated
+  environment and leaves the global Python environment untouched. It is downloaded from
+  PyPI.
+
+- **No checksum verification yet**: the downloaded actionlint archive is not compared
+  with the published checksums (`actionlint_<version>_checksums.txt`). Trust relies on
+  the pinned script and HTTPS. Verifying checksums is a possible hardening step.
+
+- **Clean workspace**: tools are installed under `RUNNER_TEMP`, and the action does not
+  modify files in your repository.
+
+- **No code injection**: inputs reach the scripts through environment variables only, and
+  flags are tokenized with `xargs`, never evaluated.
+
+- **Optional token**: `github-token` is only passed to zizmor, as `GH_TOKEN`. Read-only
+  `contents` and `actions` permissions are enough.
 
 - **Transparent Operations**: All operations performed by the action are visible in
   the workflow logs.
