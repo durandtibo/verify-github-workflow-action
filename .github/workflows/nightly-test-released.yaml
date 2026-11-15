@@ -1,7 +1,8 @@
 # Workflow testing the latest released action, to catch regressions in what consumers pick up
-# on multiple operating systems. It mirrors the tests of ci-action.yaml, which tests the
-# current checkout instead, for the inputs that exist in the released version.
-# Update the pinned release below when a new version is released.
+# on multiple operating systems. ci-action.yaml tests the current checkout instead.
+# It currently covers only the simplest cases, with the inputs of the pinned v0.0.3
+# release (`version`, `flags`, glob paths), which differ from the current inputs.
+# Mirror the cases of ci-action.yaml and update the pinned release when v0.1.0 is released.
 
 name: Test Released Action
 on:
