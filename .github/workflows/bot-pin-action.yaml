@@ -1,5 +1,5 @@
 # Pin action workflow.
-# Pins GitHub Actions in workflow files to immutable commit SHAs using ratchet.
+# Pins GitHub Actions in workflow files and the composite action to immutable commit SHAs using ratchet.
 # https://github.com/sethvargo/ratchet
 # Creates a pull request with the pinned actions after validation.
 
@@ -14,7 +14,7 @@ permissions: {}
 
 jobs:
   pin:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions:
       contents: read # actions/checkout only needs read; the app token grants write
@@ -45,19 +45,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
-      # Pin all action references to their commit SHA, keeping the version as a comment
+      # Pin all action references to their commit SHA, keeping the version as a
+      # comment. Covers top-level workflows and this repo's own action.y(a)ml,
+      # so none drift out of pinning.
       - name: Pin GitHub Actions
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }} # for API quota and auth
         run: |
-          ratchet pin .github/workflows/*.yaml .github/workflows/*.yml
+          shopt -s nullglob
+          ratchet pin .github/workflows/*.yaml .github/workflows/*.yml action.y*ml
 
       # Reformat the pinned files so ratchet's output matches repo style
       - name: Format YAML
         run: npx --yes prettier --write ".github/workflows/*.yaml" ".github/workflows/*.yml"
 
       # Create a pull request with the pinned actions
-      - uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # ratchet:peter-evans/create-pull-request@v8
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # ratchet:peter-evans/create-pull-request@v8
         if: always()
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -65,4 +69,4 @@ jobs:
           title: Pin GitHub Actions to commit SHA
           commit-message: "Pin GitHub Actions to commit SHA"
           body: Pin GitHub Actions to their commit SHA using ratchet.
-          author: ci-bot <${{secrets.CI_BOT_EMAIL}}>
+          author: ci-bot <${{ secrets.CI_BOT_EMAIL }}>
