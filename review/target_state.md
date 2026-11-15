@@ -18,7 +18,7 @@ against them.
 | --- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | P1  | Single purpose                | Lint and security-scan GitHub workflow files with actionlint and zizmor. Nothing else.                                      |
 | P2  | Composite, no code of its own | All logic is `bash` in `action.yaml`. No scripts, Docker, JS or build step. Three steps: `Prepare`, `actionlint`, `zizmor`. |
-| P3  | Portable                      | Linux, macOS and Windows runners (x64 and ARM), `shell: bash`, GNU and BSD tools, bash 3.2.                                 |
+| P3  | Portable                      | Linux and macOS runners (x64 and ARM), `shell: bash`, GNU and BSD tools, bash 3.2.                                 |
 | P4  | Safe by construction          | Inputs reach scripts only through `env:`. Flags are tokenized with `xargs`, never `eval`ed.                                 |
 | P5  | Supply-chain aware            | Nothing is executed from a moving ref. Default tool versions are exact. Downloads are verifiable.                           |
 | P6  | Zero config                   | `uses:` with no `with:` works on a checked-out repo.                                                                        |
@@ -100,7 +100,7 @@ steps (about 15 lines each). This is inherent to composite actions without scrip
 divergence.
 
 10\. `README.md` states `bash` as a requirement only; the actionlint installer also needs
-`curl` and `tar` (`unzip` on Windows). They are present on every hosted runner;
+`curl` and `tar`. They are present on every hosted runner;
 self-hosted runners need them. One line in Requirements.
 
 11\. `action.yaml` description fields use folded `>` with long lines. Fine, but the
@@ -140,13 +140,12 @@ breaking relative to `v0.0.3`, as already described in the migration section.
   Online audits query the GitHub API, so the result depends on external state. That
   weakens P5 and P6 ("same tag, same result"). Users who want the audits add one line.
 - **D3: keep `pipx`, do not switch to the zizmor release binaries.** GitHub releases
-  have binaries for Linux (x64 and ARM64), macOS (x64 and ARM64) and Windows x64 only,
-  with no Windows ARM. That would break P3, and would need per-OS archive naming (about
-  30 lines). `pipx` is preinstalled and works on all of them.
+  have binaries for Linux (x64 and ARM64) and macOS (x64 and ARM64). That would need
+  per-OS archive naming (about 30 lines). `pipx` is preinstalled and works on all of them.
 - **D4: keep the actionlint download script, but fetch it to a file and verify the
   archive checksum.** Alternative considered: skip the script and download the archive
-  directly. That needs per-OS naming (`darwin`/`linux`/`windows`, `amd64`/`arm64`,
-  `.tar.gz`/`.zip`), which the script already handles. Keep the script.
+  directly. That needs per-OS naming (`darwin`/`linux`, `amd64`/`arm64`,
+  `.tar.gz`), which the script already handles. Keep the script.
 
 ### 3.2 Implementation
 
@@ -264,7 +263,7 @@ Layout stays: `ci.yaml` calls `lib-get-test-matrix`, `ci-format`, `ci-action`;
 
 1. `README.md`: mark "Migration to v0.1.0" as "Unreleased: applies when upgrading from
    `v0.0.3`". Add the D1 behaviour change (both tools always run) to it. Add
-   `curl` and `tar` (`unzip` on Windows) to Requirements for self-hosted runners.
+   `curl` and `tar` to Requirements for self-hosted runners.
    Update zizmor links to `zizmorcore/zizmor`. Say in the `paths` row that globs are not
    expanded (already there), and mirror it in the input description in `action.yaml`.
 2. `SECURITY.md`: change the supported versions table to match real tags (`0.0.x` now,
@@ -273,7 +272,7 @@ Layout stays: `ci.yaml` calls `lib-get-test-matrix`, `ci-format`, `ci-action`;
 3. `CLAUDE.md`: record the new rules: both tools run even when one fails (the `if:`
    shape above); the installer is downloaded to a file, never run through process
    substitution; negative tests need a positive run on the same runner; `test-inputs`
-   must not use globs; marker files are a test hook. (`os_all` is the config key and
+   must not use globs; marker files are a test hook. (`os_unix` is the config key and
    `os_matrix` the exposed output; `CLAUDE.md` already says so.)
 4. `.github/PULL_REQUEST_TEMPLATE.md`: unchanged.
 
@@ -319,7 +318,7 @@ Checked locally:
 - Glob paths fail in both actionlint and zizmor (finding 1).
 - Latest releases: actionlint `v1.7.12` (installer SHA matches the tag), zizmor `v1.32.0`.
   The defaults in `action.yaml` are current.
-- zizmor release assets cover Linux x64/ARM64, macOS x64/ARM64 and Windows x64 only (D3).
+- zizmor release assets cover Linux x64/ARM64 and macOS x64/ARM64 (D3).
 
 Not verified:
 

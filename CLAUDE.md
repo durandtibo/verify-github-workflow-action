@@ -7,7 +7,7 @@ Guidance for coding agents working in this repository.
 A GitHub composite action (`action.yaml`) that verifies GitHub workflow files with
 [actionlint](https://github.com/rhysd/actionlint) and
 [zizmor](https://github.com/zizmorcore/zizmor). There is no separate script: all logic lives in the
-bash steps of `action.yaml` (they must work on Linux, macOS and Windows runners with `shell: bash`).
+bash steps of `action.yaml` (they must work on Linux and macOS runners with `shell: bash`).
 It is tested by running the action itself in workflows (`ci-action.yaml`,
 `nightly-test-released.yaml`); there is no unit test suite.
 
@@ -76,7 +76,7 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
 - Files are prefixed by their role: `ci-`, `nightly-`, `lib-`, `bot-`, `security-`.
 - `ci.yaml`: entry point for pull requests, pushes to `main`, a nightly schedule and manual runs. It
   holds no steps, only jobs that call the reusable workflows below. It tests the current checkout.
-  - `lib-get-test-matrix.yaml`: loads the OS list (`os_all`) from
+  - `lib-get-test-matrix.yaml`: loads the OS list (`os_unix`) from
     `durandtibo/workflow-config-action` once and exposes it as `os_matrix` in the `test_matrix`
     JSON output; callers pass it down to the test workflows. Never
     hardcode the OS list.

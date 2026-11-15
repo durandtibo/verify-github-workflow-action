@@ -32,7 +32,7 @@ pitfalls.
   moving ref (see [SECURITY.md](SECURITY.md))
 - **Annotations**: zizmor findings show up inline on pull requests
 - **Clean**: tools are installed outside your checkout, which is never modified
-- **Portable**: Linux, macOS and Windows runners (x64 and ARM)
+- **Portable**: Linux and macOS runners (x64 and ARM)
 - **Zero configuration**: works on a checked-out repository with no input
 
 ## Usage
@@ -126,7 +126,7 @@ steps:
 
 - Your repository must be checked out first (`actions/checkout`)
 - `bash` (standard on all GitHub-hosted runners)
-- `curl` and `tar` (`unzip` on Windows) to install actionlint; they are preinstalled on
+- `curl` and `tar` to install actionlint; they are preinstalled on
   GitHub-hosted runners, self-hosted runners need them
 - Python with `pipx` to run zizmor (both are preinstalled on GitHub-hosted runners)
 
