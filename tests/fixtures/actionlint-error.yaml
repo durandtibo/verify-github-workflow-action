@@ -1,0 +1,16 @@
+# Invalid workflow: actionlint must reject it (`needs` refers to an undefined job).
+# zizmor has no finding on it.
+name: Fixture actionlint error
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  hello:
+    needs: does-not-exist
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Say hello
+        run: echo "hello"

@@ -1,0 +1,14 @@
+# Valid workflow: must pass both actionlint and zizmor.
+name: Fixture OK
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Say hello
+        run: echo "hello"

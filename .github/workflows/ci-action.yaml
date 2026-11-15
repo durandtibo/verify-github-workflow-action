@@ -1,5 +1,7 @@
 # Workflow testing the action from the current repository code (uses: ./)
-# on multiple operating systems and with different input combinations.
+# on multiple operating systems and with different input combinations. It also runs the
+# action on invalid fixtures (tests/fixtures) and asserts that it fails when it must, so a
+# regression to "always green" is caught.
 
 name: Test Action
 on:
@@ -48,9 +50,9 @@ jobs:
         uses: ./
         with:
           paths: ".github/workflows/*.yaml"
-          actionlint-version: "1.7.9"
+          actionlint-version: "1.7.12"
           actionlint-flags: "-format '{{json .}}'"
-          zizmor-version: "1.14.0"
+          zizmor-version: "1.29.0"
           zizmor-flags: "--no-progress"
 
   test-actionlint-disabled:
@@ -104,3 +106,106 @@ jobs:
         with:
           actionlint: "false"
           zizmor: "false"
+
+  # The action must succeed or fail depending on the fixture and on which tools are enabled
+  test-fixtures:
+    name: test-fixtures (${{ matrix.name }})
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: valid fixture passes
+            paths: tests/fixtures/valid/ok.yaml
+            actionlint: "true"
+            zizmor: "true"
+            expected: success
+          - name: actionlint error is caught
+            paths: tests/fixtures/actionlint-error.yaml
+            actionlint: "true"
+            zizmor: "true"
+            expected: failure
+          - name: actionlint error is ignored when actionlint is disabled
+            paths: tests/fixtures/actionlint-error.yaml
+            actionlint: "false"
+            zizmor: "true"
+            expected: success
+          - name: zizmor error is caught
+            paths: tests/fixtures/zizmor-error.yaml
+            actionlint: "true"
+            zizmor: "true"
+            expected: failure
+          - name: zizmor error is ignored when zizmor is disabled
+            paths: tests/fixtures/zizmor-error.yaml
+            actionlint: "true"
+            zizmor: "false"
+            expected: success
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify GitHub Workflows
+        id: action
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: ${{ matrix.paths }}
+          actionlint: ${{ matrix.actionlint }}
+          zizmor: ${{ matrix.zizmor }}
+
+      # Fail if the action did not end with the expected outcome
+      - name: Check the outcome
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          EXPECTED: ${{ matrix.expected }}
+        run: |
+          set -euo pipefail
+          echo "outcome=$OUTCOME expected=$EXPECTED"
+          [ "$OUTCOME" = "$EXPECTED" ]
+
+  # Failure detection must work on every OS (xargs, arrays and installers differ per OS)
+  test-failure-os:
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      max-parallel: 8
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(inputs.test-matrix).os_matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify the actionlint error fixture
+        id: actionlint-error
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/actionlint-error.yaml
+
+      - name: Verify the zizmor error fixture
+        id: zizmor-error
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: tests/fixtures/zizmor-error.yaml
+
+      # Both fixtures must have been rejected
+      - name: Check the outcomes
+        env:
+          ACTIONLINT_OUTCOME: ${{ steps.actionlint-error.outcome }}
+          ZIZMOR_OUTCOME: ${{ steps.zizmor-error.outcome }}
+        run: |
+          set -euo pipefail
+          echo "actionlint fixture: $ACTIONLINT_OUTCOME, zizmor fixture: $ZIZMOR_OUTCOME"
+          [ "$ACTIONLINT_OUTCOME" = "failure" ]
+          [ "$ZIZMOR_OUTCOME" = "failure" ]
