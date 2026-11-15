@@ -18,7 +18,7 @@ against them.
 | --- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | P1  | Single purpose                | Lint and security-scan GitHub workflow files with actionlint and zizmor. Nothing else.                                      |
 | P2  | Composite, no code of its own | All logic is `bash` in `action.yaml`. No scripts, Docker, JS or build step. Three steps: `Prepare`, `actionlint`, `zizmor`. |
-| P3  | Portable                      | Linux and macOS runners (x64 and ARM), `shell: bash`, GNU and BSD tools, bash 3.2.                                 |
+| P3  | Portable                      | Linux and macOS runners (x64 and ARM), `shell: bash`, GNU and BSD tools, bash 3.2.                                          |
 | P4  | Safe by construction          | Inputs reach scripts only through `env:`. Flags are tokenized with `xargs`, never `eval`ed.                                 |
 | P5  | Supply-chain aware            | Nothing is executed from a moving ref. Default tool versions are exact. Downloads are verifiable.                           |
 | P6  | Zero config                   | `uses:` with no `with:` works on a checked-out repo.                                                                        |
