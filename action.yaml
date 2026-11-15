@@ -69,6 +69,7 @@ runs:
     # Validate the booleans, create a private tool directory outside the checkout and
     # put it on the PATH
     - name: Prepare
+      id: prepare
       shell: bash
       env:
         ACTIONLINT: ${{ inputs.actionlint }}
@@ -87,10 +88,10 @@ runs:
         mkdir -p "$RUNNER_TEMP/verify-workflows/bin"
         echo "$RUNNER_TEMP/verify-workflows/bin" >> "$GITHUB_PATH"
 
-    # Install actionlint with the official installer script (pinned to the v1.7.12 commit)
-    # into the tool directory, then run it
+    # Download the official installer script (pinned to the v1.7.12 commit) to a file, so a
+    # download error fails the step, install actionlint into the tool directory, then run it
     - name: actionlint
-      if: inputs.actionlint == 'true'
+      if: ${{ !cancelled() && steps.prepare.outcome == 'success' && inputs.actionlint == 'true' }}
       shell: bash
       env:
         ACTIONLINT_VERSION: ${{ inputs.actionlint-version }}
@@ -101,8 +102,10 @@ runs:
         echo "🔍 actionlint ${ACTIONLINT_VERSION}"
 
         bin_dir="$RUNNER_TEMP/verify-workflows/bin"
-        installer="https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash"
-        bash <(curl -fsSL "$installer") "$ACTIONLINT_VERSION" "$bin_dir" > /dev/null
+        installer_url="https://raw.githubusercontent.com/rhysd/actionlint/914e7df21a07ef503a81201c76d2b11c789d3fca/scripts/download-actionlint.bash"
+        installer="$RUNNER_TEMP/verify-workflows/download-actionlint.bash"
+        curl -fsSL -o "$installer" "$installer_url"
+        bash "$installer" "$ACTIONLINT_VERSION" "$bin_dir"
 
         # Tokenize flags with xargs (honors quoting) without re-parsing them as shell code.
         # Skipped when empty: GNU and BSD xargs disagree on the tokens of an empty string.
@@ -117,13 +120,17 @@ runs:
           if [ -n "$path" ]; then targets+=("$path"); fi
         done <<< "$VERIFY_PATHS"
 
+        # Marker for the tests: actionlint was started
+        touch "$RUNNER_TEMP/verify-workflows/ran-actionlint"
+
         # ${arr[@]+...}: bash 3.2 (macOS) fails on an empty array under set -u
         "$bin_dir/actionlint" ${flags[@]+"${flags[@]}"} ${targets[@]+"${targets[@]}"}
 
     # Run zizmor through pipx (isolated from the global Python environment) with inline
-    # annotations, and optionally a token for the online audits
+    # annotations, and optionally a token for the online audits. It runs even if actionlint
+    # failed, so one run reports the findings of both tools
     - name: zizmor
-      if: inputs.zizmor == 'true'
+      if: ${{ !cancelled() && steps.prepare.outcome == 'success' && inputs.zizmor == 'true' }}
       shell: bash
       env:
         ZIZMOR_VERSION: ${{ inputs.zizmor-version }}
@@ -162,5 +169,8 @@ runs:
           if [ -n "$path" ]; then targets+=("$path"); fi
         done <<< "$VERIFY_PATHS"
         if [ "${#targets[@]}" -eq 0 ]; then targets=(".github/workflows"); fi
+
+        # Marker for the tests: zizmor was started
+        touch "$RUNNER_TEMP/verify-workflows/ran-zizmor"
 
         pipx run --spec "$spec" zizmor ${flags[@]+"${flags[@]}"} "${targets[@]}"
