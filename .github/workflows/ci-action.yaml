@@ -45,14 +45,18 @@ jobs:
         with:
           persist-credentials: false
 
-      # Custom paths, versions and flags
+      # Custom paths (explicit files: globs are not expanded), versions and flags.
+      # The zizmor version is an exact older release, intentionally different from the
+      # default in action.yaml.
       - name: Verify GitHub Workflows
         uses: ./
         with:
-          paths: ".github/workflows/*.yaml"
+          paths: |
+            .github/workflows/ci.yaml
+            .github/workflows/ci-action.yaml
           actionlint-version: "1.7.12"
           actionlint-flags: "-format '{{json .}}'"
-          zizmor-version: "1.29.0"
+          zizmor-version: "1.31.1"
           zizmor-flags: "--no-progress"
 
   test-actionlint-disabled:
