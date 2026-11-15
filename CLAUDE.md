@@ -91,6 +91,10 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
 - `security-dependency-review.yaml`: dependency review on pull requests.
 - `bot-pin-action.yaml`: scheduled automation that pins actions to SHAs with ratchet and opens a PR.
 - `bot-cancel-stale-queued-runs.yaml`: scheduled automation that cancels stale queued runs.
+- `bot-format-files.yaml`: weekly automation that formats the files and opens a PR.
+- `bot-sync-shared-makefile.yaml`: weekly automation that syncs the `.make` subtree
+  (`durandtibo/shared-makefiles`) and opens a PR.
+- `security-scorecard.yaml`: OpenSSF Scorecard analysis (feeds the README badge).
 
 Conventions:
 
