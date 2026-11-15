@@ -111,7 +111,10 @@ jobs:
           actionlint: "false"
           zizmor: "false"
 
-  # The action must succeed or fail depending on the fixture and on which tools are enabled
+  # The action must succeed or fail depending on the fixture and on which tools are enabled.
+  # A positive run on the valid fixture comes first on the same runner: if the install were
+  # broken it would fail there, so a failing negative run can only come from a finding or
+  # a rejected input.
   test-fixtures:
     name: test-fixtures (${{ matrix.name }})
     permissions:
@@ -163,6 +166,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # Positive control: the tools install and accept the valid fixture
+      - name: Verify the valid fixture
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+
       - name: Verify GitHub Workflows
         id: action
         continue-on-error: true
@@ -182,7 +191,9 @@ jobs:
           echo "outcome=$OUTCOME expected=$EXPECTED"
           [ "$OUTCOME" = "$EXPECTED" ]
 
-  # Failure detection must work on every OS (xargs, arrays and installers differ per OS)
+  # Failure detection must work on every OS (xargs, arrays and installers differ per OS).
+  # The positive run comes first on the same runner, so a failed install fails the job there
+  # instead of passing the negative runs for the wrong reason.
   test-failure-os:
     permissions:
       contents: read
@@ -198,6 +209,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
         with:
           persist-credentials: false
+
+      # Positive control: the tools install and accept the valid fixture
+      - name: Verify the valid fixture
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
 
       - name: Verify the actionlint error fixture
         id: actionlint-error
@@ -223,6 +240,51 @@ jobs:
           echo "actionlint fixture: $ACTIONLINT_OUTCOME, zizmor fixture: $ZIZMOR_OUTCOME"
           [ "$ACTIONLINT_OUTCOME" = "failure" ]
           [ "$ZIZMOR_OUTCOME" = "failure" ]
+
+  # Both tools must run in the same run even when the first one fails, so one run reports
+  # all the problems. Each tool step leaves a marker file in RUNNER_TEMP once started.
+  test-both-tools-run:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Positive control: the tools install and accept the valid fixture
+      - name: Verify the valid fixture
+        uses: ./
+        with:
+          paths: tests/fixtures/valid/ok.yaml
+
+      # The markers of the control run must not leak into the assertion below
+      - name: Remove the markers
+        run: |
+          set -euo pipefail
+          rm -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" "$RUNNER_TEMP/verify-workflows/ran-zizmor"
+
+      - name: Verify both error fixtures at once
+        id: both-errors
+        continue-on-error: true
+        uses: ./
+        with:
+          paths: |
+            tests/fixtures/actionlint-error.yaml
+            tests/fixtures/zizmor-error.yaml
+
+      # The action fails and both tools ran
+      - name: Check the outcome and the markers
+        env:
+          OUTCOME: ${{ steps.both-errors.outcome }}
+        run: |
+          set -euo pipefail
+          echo "outcome=$OUTCOME"
+          [ "$OUTCOME" = "failure" ]
+          [ -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
+          [ -f "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
 
   # Paths are newline-separated and passed as is: spaces are preserved, several paths work,
   # and the tools must not leave files in the checkout
