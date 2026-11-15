@@ -53,8 +53,8 @@ After submitting a vulnerability report:
 
 When using this action, we recommend:
 
-1. **Pin to Specific Versions**: Use a specific version tag (e.g., `@v0.0.3`), ideally its commit SHA, instead of
-   `@main` to avoid unexpected changes.
+1. **Pin to Specific Versions**: Use a specific version tag (e.g., `@v0.0.3`), ideally its commit SHA,
+   instead of `@main` to avoid unexpected changes.
 
 2. **Review Changes**: When updating to a new version, review the changes in the release
    notes.
