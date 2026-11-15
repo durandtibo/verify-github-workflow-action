@@ -1,5 +1,6 @@
 # Pin action workflow.
-# Pins GitHub Actions in workflow files and the composite action to immutable commit SHAs using ratchet.
+# Pins GitHub Actions in workflow files and the composite action to immutable
+# commit SHAs using ratchet.
 # https://github.com/sethvargo/ratchet
 # Creates a pull request with the pinned actions after validation.
 
@@ -23,7 +24,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # ratchet:actions/create-github-app-token@v3.3.0
         with:
-          app-id: ${{ secrets.TIBOT_APP_ID }}
+          client-id: ${{ secrets.TIBOT_CLIENT_ID }}
           private-key: ${{ secrets.TIBOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
@@ -55,9 +56,12 @@ jobs:
           shopt -s nullglob
           ratchet pin .github/workflows/*.yaml .github/workflows/*.yml action.y*ml
 
-      # Reformat the pinned files so ratchet's output matches repo style
+      # Reformat the pinned files so ratchet's output matches repo style.
+      # Limited to the workflows: the test fixtures are deliberately invalid
+      # and must not be rewritten.
       - name: Format YAML
-        run: npx --yes prettier --write ".github/workflows/*.yaml" ".github/workflows/*.yml"
+        run: |
+          make format-yaml YAML_FORMAT_PATH='.github/workflows/*.{yml,yaml}'
 
       # Create a pull request with the pinned actions
       - name: Create pull request
