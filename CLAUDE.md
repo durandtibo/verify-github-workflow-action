@@ -13,13 +13,14 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
 
 ## Environment
 
-- Use the `Makefile`; run `make help` to list targets (`make format`, `make format-markdown`,
-  `make format-yaml`, `make zizmor`).
-- Run `make format` before committing. It runs markdownlint, prettier (which rewrites files) and
-  yamllint. Fix what they report instead of disabling rules (config: `.markdownlint.json`,
-  `.yamllint.yaml`).
+- Use the `Makefile`; run `make help` to list targets (`make format`, `make lint`,
+  `make lint-actions`, `make zizmor`, ...).
+- Do not edit `.make/`: it is a shared directory synced by `bot-sync-shared-makefile.yaml`.
+- Run `make format` and `make lint` before committing. Fix what they report instead of disabling
+  rules (config: `.markdownlint.json`, `.yamllint.yaml`). `make format` rewrites files.
 - `make zizmor` applies autofixes to `.github/workflows`; review the diff it produces.
-- Workflows cannot be run locally. Say so in the PR instead of claiming they pass.
+- Workflows cannot be run locally (the action itself is only exercised by CI). Say so in the PR
+  instead of claiming they pass.
 
 ## Git workflow
 
@@ -27,6 +28,10 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
   push to `main`.
 - Name branches `<type>/<short-description>` in kebab-case, with type one of: `feat`, `bugfix`,
   `hotfix`, `docs`, `refactor`, `perf`, `test`, `chore`, `ci`.
+- Write commit messages and PR titles as a short imperative sentence starting with a verb such as
+  `Add`, `Fix`, `Update`, `Remove` or `Improve`. Do not use conventional-commit prefixes like
+  `docs:` or `feat:` (the type prefix is only for branch names). The squash-merge appends the PR
+  number, so do not add one.
 - PR descriptions follow `.github/PULL_REQUEST_TEMPLATE.md` and cover what changed, what was
   deliberately left alone, and any behaviour change.
 - On conflicts with `main`, merge `origin/main` into the branch; do not rebase and force-push.
@@ -102,9 +107,10 @@ Conventions:
 
 - Pin third-party actions to commit SHAs with a `# ratchet:<owner>/<repo>@<tag>` comment, never to
   tags or branches. Dependabot (`.github/dependabot.yml`) bumps them.
-- Set least-privilege `permissions` (workflow level `permissions: {}` or `contents: read`, widened
-  per job only when needed) and `timeout-minutes` on every job. Use `persist-credentials: false` on
-  checkout.
+- Every workflow has `permissions: {}` at the workflow level (it grants nothing), never a grant.
+  Set least-privilege `permissions` on every job, including jobs that call a reusable workflow, and
+  `timeout-minutes` on every job. Use `persist-credentials: false` on checkout.
+- Put `make` targets in the steps rather than duplicating commands, so local runs and CI match.
 - Reusable checks are `workflow_call` workflows that also have `workflow_dispatch`, so they can be
   run alone. Add a new check as a new workflow plus a job in `ci.yaml` (or `nightly.yaml` for
   released-version checks).
@@ -134,6 +140,6 @@ Conventions:
 
 ## Reporting
 
-- State which checks ran (`make format`, `make zizmor`) and which did not.
+- State which checks ran (`make format`, `make lint`, `make zizmor`) and which did not.
 - Note that CI was not awaited, and that the workflows could not be run locally.
 - Report failures that already exist on `main` rather than hiding them.
