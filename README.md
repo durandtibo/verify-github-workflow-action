@@ -6,7 +6,7 @@
 
 A GitHub Action to verify and validate GitHub workflow files using
 [actionlint](https://github.com/rhysd/actionlint) and
-[zizmor](https://github.com/woodruffw/zizmor).
+[zizmor](https://github.com/zizmorcore/zizmor).
 This action helps catch errors and issues in your workflow files early, ensuring they
 follow best practices, are correctly configured, and are free of common security
 pitfalls.
@@ -124,10 +124,18 @@ steps:
 
 - Your repository must be checked out first (`actions/checkout`)
 - `bash` (standard on all GitHub-hosted runners)
+- `curl` and `tar` (`unzip` on Windows) to install actionlint; they are preinstalled on
+  GitHub-hosted runners, self-hosted runners need them
 - Python with `pipx` to run zizmor (both are preinstalled on GitHub-hosted runners)
 
 ## Migration to v0.1.0
 
+> **Unreleased**: this applies when upgrading from `v0.0.3` to `v0.1.0`, which is not
+> released yet. `v0.0.3` behaves as described by its own README.
+
+- Both tools always run: zizmor now runs even if actionlint failed (and the reverse), so
+  one run reports the findings of both. The action still fails if either tool fails. A
+  failed preparation (invalid input) still skips both tools.
 - `paths` now defaults to `""` (the workflows in `.github/workflows`) instead of
   `.github/workflows/*`. It is newline-separated and no longer expanded as a glob: list
   the files explicitly.
