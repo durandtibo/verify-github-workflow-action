@@ -47,3 +47,4 @@ jobs:
       test-matrix: ${{ needs.get-matrix.outputs.test_matrix }}
     permissions:
       contents: read
+      actions: read # needed by the test-github-token job in ci-action.yaml
