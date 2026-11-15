@@ -24,7 +24,7 @@ pitfalls.
 ## Features
 
 - **Automated Validation**: Automatically checks all workflow files in `.github/workflows/`
-- **actionlint Integration**: Uses the latest version of actionlint for comprehensive validation
+- **actionlint Integration**: Uses a pinned version of actionlint (`latest` is accepted) for comprehensive validation
 - **zizmor Integration**: Runs zizmor to catch security issues such as script injection,
   overly broad `GITHUB_TOKEN` permissions, and unpinned third-party actions
 - **Error Detection**: Catches syntax errors, invalid workflow configurations, best
@@ -71,10 +71,10 @@ steps:
 
 This action performs the following steps:
 
-1. **Install actionlint**: Downloads and installs the latest version of actionlint (unless
+1. **Install actionlint**: Downloads and installs actionlint (pinned version by default; unless
    disabled)
 2. **Validate**: Runs actionlint on all workflow files in `.github/workflows/`
-3. **Install zizmor**: Installs the latest version of zizmor (unless disabled)
+3. **Install zizmor**: Installs zizmor with pipx (pinned version by default; unless disabled)
 4. **Security Scan**: Runs zizmor on the same workflow files to catch security issues
 
 The action will fail if any errors are found in your workflow files, helping you catch
@@ -85,15 +85,16 @@ issues before they cause problems in production.
 
 ### Inputs
 
-| Name                 | Description                                                                               | Default  |
-| -------------------- | ----------------------------------------------------------------------------------------- | -------- |
-| `paths`              | Newline-separated workflow files (no glob expansion; default: all of `.github/workflows`) | `""`     |
-| `actionlint`         | Whether to run actionlint (`"true"`/`"false"`)                                            | `true`   |
-| `actionlint-version` | Version of actionlint to install                                                          | `latest` |
-| `actionlint-flags`   | Additional flags to pass to actionlint                                                    | `""`     |
-| `zizmor`             | Whether to run zizmor (`"true"`/`"false"`)                                                | `true`   |
-| `zizmor-version`     | Version of zizmor to install                                                              | `latest` |
-| `zizmor-flags`       | Additional flags to pass to zizmor                                                        | `""`     |
+| Name                 | Description                                                                                        | Default  |
+| -------------------- | -------------------------------------------------------------------------------------------------- | -------- |
+| `paths`              | Newline-separated workflow files (no glob expansion; default: all of `.github/workflows`)          | `""`     |
+| `actionlint`         | Whether to run actionlint (`"true"`/`"false"`)                                                     | `true`   |
+| `actionlint-version` | Version of actionlint to install                                                                   | `1.7.12` |
+| `actionlint-flags`   | Additional flags to pass to actionlint                                                             | `""`     |
+| `zizmor`             | Whether to run zizmor (`"true"`/`"false"`)                                                         | `true`   |
+| `zizmor-version`     | Version of zizmor to install                                                                       | `1.32.0` |
+| `zizmor-flags`       | Additional flags to pass to zizmor (`--format=github` is added unless you pass `--format`)         | `""`     |
+| `github-token`       | Token for zizmor online audits (`${{ github.token }}`; needs `contents: read` and `actions: read`) | `""`     |
 
 ### Disabling actionlint or zizmor
 

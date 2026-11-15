@@ -24,9 +24,11 @@ inputs:
     default: "true"
 
   actionlint-version:
-    description: "Version of actionlint to install (default: latest)"
+    description: >
+      Version of actionlint to install, `x.y.z` or `latest`. The default is pinned and
+      bumped on each release of this action.
     required: false
-    default: "latest"
+    default: "1.7.12"
 
   actionlint-flags:
     description: "Additional flags to pass to actionlint"
@@ -41,23 +43,47 @@ inputs:
     default: "true"
 
   zizmor-version:
-    description: "Version of zizmor to install (default: latest)"
+    description: >
+      Version of zizmor to install, `x.y.z` or `latest`. The default is pinned and
+      bumped on each release of this action.
     required: false
-    default: "latest"
+    default: "1.32.0"
 
   zizmor-flags:
-    description: "Additional flags to pass to zizmor"
+    description: >
+      Additional flags to pass to zizmor. The action adds `--format=github` (inline
+      annotations) unless the flags contain `--format`.
+    required: false
+    default: ""
+
+  github-token:
+    description: >
+      GitHub token passed to zizmor as `GH_TOKEN` to enable its online audits. Optional.
+      `${{ github.token }}` is enough (needs `contents: read` and `actions: read`).
     required: false
     default: ""
 
 runs:
   using: "composite"
   steps:
-    # Create a private tool directory outside the checkout and put it on the PATH
+    # Validate the booleans, create a private tool directory outside the checkout and
+    # put it on the PATH
     - name: Prepare
       shell: bash
+      env:
+        ACTIONLINT: ${{ inputs.actionlint }}
+        ZIZMOR: ${{ inputs.zizmor }}
       run: |
         set -euo pipefail
+        for pair in "actionlint=$ACTIONLINT" "zizmor=$ZIZMOR"; do
+          case "${pair#*=}" in
+            true | false) ;;
+            *)
+              echo "::error::input '${pair%%=*}' must be 'true' or 'false', got '${pair#*=}'"
+              exit 1
+              ;;
+          esac
+        done
         mkdir -p "$RUNNER_TEMP/verify-workflows/bin"
         echo "$RUNNER_TEMP/verify-workflows/bin" >> "$GITHUB_PATH"
 
@@ -94,7 +120,8 @@ runs:
         # ${arr[@]+...}: bash 3.2 (macOS) fails on an empty array under set -u
         "$bin_dir/actionlint" ${flags[@]+"${flags[@]}"} ${targets[@]+"${targets[@]}"}
 
-    # Run zizmor through pipx (isolated from the global Python environment), then run it
+    # Run zizmor through pipx (isolated from the global Python environment) with inline
+    # annotations, and optionally a token for the online audits
     - name: zizmor
       if: inputs.zizmor == 'true'
       shell: bash
@@ -102,6 +129,7 @@ runs:
         ZIZMOR_VERSION: ${{ inputs.zizmor-version }}
         ZIZMOR_FLAGS: ${{ inputs.zizmor-flags }}
         VERIFY_PATHS: ${{ inputs.paths }}
+        GH_TOKEN: ${{ inputs.github-token }}
       run: |
         set -euo pipefail
         echo "🔍 zizmor ${ZIZMOR_VERSION}"
@@ -117,6 +145,16 @@ runs:
         if [ -n "$ZIZMOR_FLAGS" ]; then
           while IFS= read -r flag; do flags+=("$flag"); done < <(xargs -n1 <<< "$ZIZMOR_FLAGS")
         fi
+
+        # Annotate the PR unless the user chose a format
+        has_format=false
+        for flag in ${flags[@]+"${flags[@]}"}; do
+          case "$flag" in --format | --format=*) has_format=true ;; esac
+        done
+        if [ "$has_format" = false ]; then flags+=("--format=github"); fi
+
+        # An empty token makes zizmor fail: only pass it when set
+        if [ -z "$GH_TOKEN" ]; then unset GH_TOKEN; fi
 
         # zizmor needs an explicit input: default to the workflows directory
         targets=()

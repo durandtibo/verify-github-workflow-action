@@ -123,6 +123,16 @@ jobs:
             actionlint: "true"
             zizmor: "true"
             expected: success
+          - name: invalid actionlint boolean fails
+            paths: tests/fixtures/valid/ok.yaml
+            actionlint: "yes"
+            zizmor: "true"
+            expected: failure
+          - name: invalid zizmor boolean fails
+            paths: tests/fixtures/valid/ok.yaml
+            actionlint: "true"
+            zizmor: "yes"
+            expected: failure
           - name: actionlint error is caught
             paths: tests/fixtures/actionlint-error.yaml
             actionlint: "true"
@@ -242,3 +252,40 @@ jobs:
           status="$(git status --porcelain)"
           echo "$status"
           [ -z "$status" ]
+
+  # `latest` for both tools, and a user-chosen zizmor format (no --format=github added)
+  test-latest-and-format:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify GitHub Workflows
+        uses: ./
+        with:
+          actionlint-version: latest
+          zizmor-version: latest
+          zizmor-flags: --format=plain --no-progress
+
+  # zizmor online audits with the workflow token (read-only permissions are enough)
+  test-github-token:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify GitHub Workflows
+        uses: ./
+        with:
+          github-token: ${{ github.token }}
