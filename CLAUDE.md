@@ -8,8 +8,8 @@ A GitHub composite action (`action.yaml`) that verifies GitHub workflow files wi
 [actionlint](https://github.com/rhysd/actionlint) and
 [zizmor](https://github.com/woodruffw/zizmor). There is no separate script: all logic lives in the
 bash steps of `action.yaml` (they must work on Linux, macOS and Windows runners with `shell: bash`).
-It is tested by running the action itself in workflows (`test-local.yaml`, `test-stable.yaml`); there
-is no unit test suite.
+It is tested by running the action itself in workflows (`ci-action.yaml`,
+`nightly-test-released.yaml`); there is no unit test suite.
 
 ## Environment
 
@@ -50,17 +50,23 @@ is no unit test suite.
 
 ## Workflow structure (`.github/workflows/`)
 
-- `ci.yaml`: entry point for pull requests, pushes to `main` and manual runs. It holds no steps,
-  only jobs that call the reusable workflows below.
-  - `format.yaml`: markdownlint/prettier and yamllint checks.
-  - `test-local.yaml`: runs the action from this checkout (the version not released yet) on the
+- Files are prefixed by their role: `ci-`, `nightly-`, `lib-`, `bot-`, `security-`.
+- `ci.yaml`: entry point for pull requests, pushes to `main`, a nightly schedule and manual runs. It
+  holds no steps, only jobs that call the reusable workflows below. It tests the current checkout.
+  - `lib-get-test-matrix.yaml`: loads the OS matrix (`os_all`) from
+    `durandtibo/workflow-config-action` once; callers pass it down to the test workflows. Never
+    hardcode the OS list.
+  - `ci-format.yaml`: markdownlint/prettier and yamllint checks.
+  - `ci-action.yaml`: runs the action from this checkout (the version not released yet) on the
     full OS matrix and with different input combinations (custom versions and flags, actionlint
     disabled, zizmor disabled, both disabled).
-  - `test-stable.yaml`: runs the latest released action.
-- `nightly-tests.yaml`: scheduled entry point that calls the same reusable workflows as `ci.yaml`.
-- `dependency-review.yml`: dependency review on pull requests.
-- `pin-action.yaml`: scheduled automation that pins actions to SHAs with ratchet and opens a PR.
-- `cancel-stale-queued-runs.yaml`: scheduled automation that cancels stale queued runs.
+- `ci-verify-workflows.yaml`: verifies this repo's workflows with the latest released action. It
+  has its own triggers and is deliberately not called from `ci.yaml`.
+- `nightly.yaml`: scheduled entry point that tests the latest released action.
+  - `nightly-test-released.yaml`: runs the latest released action (pinned, update it on release).
+- `security-dependency-review.yaml`: dependency review on pull requests.
+- `bot-pin-action.yaml`: scheduled automation that pins actions to SHAs with ratchet and opens a PR.
+- `bot-cancel-stale-queued-runs.yaml`: scheduled automation that cancels stale queued runs.
 
 Conventions:
 
@@ -70,7 +76,8 @@ Conventions:
   per job only when needed) and `timeout-minutes` on every job. Use `persist-credentials: false` on
   checkout.
 - Reusable checks are `workflow_call` workflows that also have `workflow_dispatch`, so they can be
-  run alone. Add a new check as a new workflow plus a job in `ci.yaml` and `nightly-tests.yaml`.
+  run alone. Add a new check as a new workflow plus a job in `ci.yaml` (or `nightly.yaml` for
+  released-version checks).
 - Do not interpolate untrusted values (`github.event.*`, inputs) in `run:`; use `env:`.
 - Workflows must pass the action's own checks (actionlint and zizmor), since this repo verifies
   itself.
@@ -78,9 +85,9 @@ Conventions:
 
 ## Tests
 
-- Every new or changed input needs a job in `test-local.yaml` exercising it (including the
-  disabled and default paths). Mirror the relevant case in `test-stable.yaml` once released.
-- Keep the OS matrix in `test-local.yaml` and `test-stable.yaml` identical.
+- Every new or changed input needs a job in `ci-action.yaml` exercising it (including the
+  disabled and default paths). Mirror the relevant case in `nightly-test-released.yaml` once released.
+- Keep the OS matrix in both test workflows identical (it comes from `lib-get-test-matrix.yaml`).
 - Every bug fix needs a test case that fails without the fix.
 - If a check fails for a real reason, report it rather than weakening the test or the linters.
 

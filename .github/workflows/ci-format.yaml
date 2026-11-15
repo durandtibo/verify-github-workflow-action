@@ -1,0 +1,35 @@
+# Formatting and linting workflow.
+# Checks the Markdown and YAML files of the repository.
+
+name: Format
+on:
+  workflow_call:
+  workflow_dispatch: # to trigger manually
+
+permissions: {}
+
+jobs:
+  format:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # ratchet:actions/setup-node@v7
+        with:
+          node-version: "latest"
+
+      - name: Lint and format Markdown files
+        run: |
+          make format-markdown
+
+      - name: Lint YAML files
+        run: |
+          make format-yaml

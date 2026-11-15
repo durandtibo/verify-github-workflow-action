@@ -1,40 +1,31 @@
-name: Test Stable Action
+# Workflow testing the latest released action, to catch regressions in what consumers pick up
+# on multiple operating systems. It mirrors the tests of ci-action.yaml, which tests the
+# current checkout instead, for the inputs that exist in the released version.
+# Update the pinned release below when a new version is released.
 
+name: Test Released Action
 on:
   workflow_call:
-  workflow_dispatch: # to trigger manually
+    inputs:
+      test-matrix:
+        description: "JSON test matrix from lib-get-test-matrix.yaml, loaded once by the caller"
+        required: true
+        type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   test:
+    permissions:
+      contents: read
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 2
+    timeout-minutes: 5
     strategy:
       max-parallel: 8
       fail-fast: false
       matrix:
-        os:
-          [
-            ubuntu-latest,
-            ubuntu-26.04,
-            ubuntu-24.04,
-            ubuntu-22.04,
-            ubuntu-26.04-arm,
-            ubuntu-24.04-arm,
-            ubuntu-22.04-arm,
-            macos-latest,
-            macos-26,
-            macos-15,
-            macos-14,
-            macos-26-intel,
-            macos-15-intel,
-            windows-latest,
-            windows-2025,
-            windows-2022,
-            windows-11-arm,
-          ]
+        os: ${{ fromJson(inputs.test-matrix).os_matrix }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
@@ -42,14 +33,19 @@ jobs:
           persist-credentials: false
       - name: Verify GitHub Workflows
         uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
+
   test-inputs:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
         with:
           persist-credentials: false
+
+      # Custom paths, version and flags
       - name: Verify GitHub Workflows
         uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
         with:
