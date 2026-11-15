@@ -76,8 +76,9 @@ is from reading the code.
    - `ci-format.yaml` uses `node-version: "latest"` and `bot-pin-action.yaml` installs
      "the latest ratchet". These are repo tooling, not the shipped action, so they are
      lower risk, but they make CI results time-dependent.
-   - The `Makefile` `zizmor` target runs an unpinned `pip3 install --user zizmor`, which
-     also fails on PEP 668 Pythons (the issue the action itself already solved).
+   - The `Makefile` `zizmor` target still runs an unpinned `pip3 install --user zizmor`
+     when zizmor is missing, which also fails on PEP 668 Pythons. `make install-zizmor`
+     (in `.make/actions.mk`) now exists and is the supported way to install it.
 7. **P11/P12: documentation promises a release that does not exist.** `README.md` has a
    "Migration to v0.1.0" section and `SECURITY.md` lists `0.1.x` as supported, while the
    latest tag is `v0.0.3` and the README examples pin `v0.0.3`. This is accepted by
@@ -248,8 +249,9 @@ Layout stays: `ci.yaml` calls `lib-get-test-matrix`, `ci-format`, `ci-action`;
 6. **Repo tooling pins (finding 6).** Replace `node-version: "latest"` in
    `ci-format.yaml` with an exact LTS major. Keep the ratchet bot installing the latest
    ratchet, since it only rewrites SHAs and opens a PR for review.
-7. **Makefile.** Change the `zizmor` target to use `pipx run zizmor` (same isolation as
-   the action) instead of `pip3 install --user`.
+7. **Makefile.** Make the `zizmor` target depend on `install-zizmor` and delete its inline
+   `pip3 install --user` fallback. Contributors install the tool with
+   `make install-zizmor` (or `make install-tools`).
 
 ## 5. Documentation target
 
@@ -295,8 +297,8 @@ One PR per logical change, branched from an up-to-date `main`, per `CLAUDE.md`:
 3. `refactor/`: download the installer to a file, keep its output, add `id: prepare`
    and the `!cancelled()` conditions (D1). One PR because the test from step 2 turns
    green with it.
-4. `ci/` and `chore/`: pin the Node version in `ci-format.yaml`, switch the Makefile
-   `zizmor` target to `pipx`.
+4. `ci/` and `chore/`: pin the Node version in `ci-format.yaml`, make the Makefile
+   `zizmor` target use `make install-zizmor`.
 5. `docs/`: README, SECURITY.md, CLAUDE.md as listed in section 5.
 6. Release `v0.1.0`: bump the defaults if newer tools exist (current: actionlint 1.7.12
    and zizmor 1.32.0 are the latest, and the installer SHA `914e7df…` is the `v1.7.12`
