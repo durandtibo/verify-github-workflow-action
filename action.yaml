@@ -160,52 +160,6 @@ runs:
         done
 
         flags=()
-        if [ -n "$ACTIONLINT_FLAGS" ]; then
-          while IFS= read -r flag; do flags+=("$flag"); done < <(xargs -n1 <<< "$ACTIONLINT_FLAGS")
-        fi
-
-        # One path per line, spaces preserved. No path: actionlint discovers .github/workflows.
-        targets=()
-        while IFS= read -r path; do
-          if [ -n "$path" ]; then targets+=("$path"); fi
-        done <<< "$VERIFY_PATHS"
-
-        # Marker for the tests: actionlint was started
-        touch "$RUNNER_TEMP/verify-workflows/ran-actionlint"
-
-        # ${arr[@]+...}: bash 3.2 (macOS) fails on an empty array under set -u
-        "$bin_dir/actionlint" ${flags[@]+"${flags[@]}"} ${targets[@]+"${targets[@]}"}
-
-    # Run zizmor through pipx (isolated from the global Python environment) with inline
-    # annotations, and optionally a token for the online audits. It runs even if actionlint
-    # failed, so one run reports the findings of both tools
-    - name: zizmor
-      if: ${{ !cancelled() && steps.prepare.outcome == 'success' && inputs.zizmor == 'true' }}
-      shell: bash
-      env:
-        ZIZMOR_VERSION: ${{ inputs.zizmor-version }}
-        ZIZMOR_FLAGS: ${{ inputs.zizmor-flags }}
-        VERIFY_PATHS: ${{ inputs.paths }}
-        GH_TOKEN: ${{ inputs.github-token }}
-      run: |
-        set -euo pipefail
-        echo "🔍 zizmor ${ZIZMOR_VERSION}"
-
-        if ! command -v pipx > /dev/null; then
-          echo "::error::pipx is required to run zizmor but was not found on this runner"
-          exit 1
-        fi
-        spec="zizmor"
-        if [ "$ZIZMOR_VERSION" != "latest" ]; then spec="zizmor==${ZIZMOR_VERSION}"; fi
-
-        # Recent zizmor releases need Python >= 3.11, which some runners (ubuntu-22.04) lack
-        # as the default: use the newest one found, else let pipx download one
-        pipx_python=(--python 3.13 --fetch-missing-python)
-        for v in 3.13 3.12 3.11; do
-          if command -v "python${v}" > /dev/null; then pipx_python=(--python "python${v}"); break; fi
-        done
-
-        flags=()
         if [ -n "$ZIZMOR_FLAGS" ]; then
           while IFS= read -r flag; do flags+=("$flag"); done < <(xargs -n1 <<< "$ZIZMOR_FLAGS")
         fi
