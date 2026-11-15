@@ -209,3 +209,36 @@ jobs:
           echo "actionlint fixture: $ACTIONLINT_OUTCOME, zizmor fixture: $ZIZMOR_OUTCOME"
           [ "$ACTIONLINT_OUTCOME" = "failure" ]
           [ "$ZIZMOR_OUTCOME" = "failure" ]
+
+  # Paths are newline-separated and passed as is: spaces are preserved, several paths work,
+  # and the tools must not leave files in the checkout
+  test-paths:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify a path containing a space
+        uses: ./
+        with:
+          paths: tests/fixtures/dir with space/ok.yaml
+
+      - name: Verify several paths
+        uses: ./
+        with:
+          paths: |
+            tests/fixtures/valid/ok.yaml
+            tests/fixtures/dir with space/ok.yaml
+
+      # The installers must not write into the checkout
+      - name: Check the workspace is clean
+        run: |
+          set -euo pipefail
+          status="$(git status --porcelain)"
+          echo "$status"
+          [ -z "$status" ]

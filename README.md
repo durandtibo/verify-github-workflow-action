@@ -85,15 +85,15 @@ issues before they cause problems in production.
 
 ### Inputs
 
-| Name                 | Description                                    | Default               |
-| -------------------- | ---------------------------------------------- | --------------------- |
-| `paths`              | Paths or glob patterns to workflow files       | `.github/workflows/*` |
-| `actionlint`         | Whether to run actionlint (`"true"`/`"false"`) | `true`                |
-| `actionlint-version` | Version of actionlint to install               | `latest`              |
-| `actionlint-flags`   | Additional flags to pass to actionlint         | `""`                  |
-| `zizmor`             | Whether to run zizmor (`"true"`/`"false"`)     | `true`                |
-| `zizmor-version`     | Version of zizmor to install                   | `latest`              |
-| `zizmor-flags`       | Additional flags to pass to zizmor             | `""`                  |
+| Name                 | Description                                                                               | Default  |
+| -------------------- | ----------------------------------------------------------------------------------------- | -------- |
+| `paths`              | Newline-separated workflow files (no glob expansion; default: all of `.github/workflows`) | `""`     |
+| `actionlint`         | Whether to run actionlint (`"true"`/`"false"`)                                            | `true`   |
+| `actionlint-version` | Version of actionlint to install                                                          | `latest` |
+| `actionlint-flags`   | Additional flags to pass to actionlint                                                    | `""`     |
+| `zizmor`             | Whether to run zizmor (`"true"`/`"false"`)                                                | `true`   |
+| `zizmor-version`     | Version of zizmor to install                                                              | `latest` |
+| `zizmor-flags`       | Additional flags to pass to zizmor                                                        | `""`     |
 
 ### Disabling actionlint or zizmor
 
