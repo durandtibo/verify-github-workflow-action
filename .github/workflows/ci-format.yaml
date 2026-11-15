@@ -1,5 +1,6 @@
 # Formatting and linting workflow.
-# Checks the Markdown and YAML files of the repository.
+# Checks the Markdown and YAML files of the repository with the linters (markdownlint and
+# yamllint). The checks only read the files: they fail on a problem instead of rewriting it.
 
 name: Format
 on:
@@ -26,10 +27,10 @@ jobs:
         with:
           node-version: "24" # exact LTS major, so results do not depend on the time
 
-      - name: Lint and format Markdown files
+      - name: Lint Markdown files
         run: |
-          make format-markdown
+          make lint-markdown
 
       - name: Lint YAML files
         run: |
-          make format-yaml
+          make lint-yaml
