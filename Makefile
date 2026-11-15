@@ -25,13 +25,12 @@ format: format-yaml format-makefile format-shell format-toml format-markdown ## 
 lint: lint-yaml lint-makefile lint-shell lint-markdown lint-actions ## Lint all files
 
 .PHONY : zizmor
-zizmor :
+zizmor:
 	@command -v zizmor >/dev/null 2>&1 || { \
 		echo "📦 zizmor not found, installing zizmor..."; \
 		pip3 install --user zizmor; \
-	}
+		}
 	@echo "🔍 Running zizmor with autofixes on GitHub workflows..."
 	-zizmor --fix=all .github/workflows
 	@echo "✅ Zizmor autofix complete (review any remaining findings above)"
 	@echo ""
-
