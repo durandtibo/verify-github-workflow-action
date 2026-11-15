@@ -1,0 +1,17 @@
+# Insecure workflow: zizmor must reject it (unpinned action, credentials persisted).
+# actionlint has no error on it.
+name: Fixture zizmor error
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Say hello
+        run: echo "hello"
