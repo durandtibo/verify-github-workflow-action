@@ -6,7 +6,7 @@ Guidance for coding agents working in this repository.
 
 A GitHub composite action (`action.yaml`) that verifies GitHub workflow files with
 [actionlint](https://github.com/rhysd/actionlint) and
-[zizmor](https://github.com/woodruffw/zizmor). There is no separate script: all logic lives in the
+[zizmor](https://github.com/zizmorcore/zizmor). There is no separate script: all logic lives in the
 bash steps of `action.yaml` (they must work on Linux, macOS and Windows runners with `shell: bash`).
 It is tested by running the action itself in workflows (`ci-action.yaml`,
 `nightly-test-released.yaml`); there is no unit test suite.
@@ -52,6 +52,13 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
 - Code in `run:` blocks must stay clean under `shellcheck`; justify any `# shellcheck disable`.
 - Structure: three steps (`Prepare`, `actionlint`, `zizmor`); each tool step installs and runs.
   Keep it that way.
+- The tool steps use `if: ${{ !cancelled() && steps.prepare.outcome == 'success' && inputs.<tool> == 'true' }}`,
+  so both tools run even when one fails and one run reports all problems. A failed `Prepare`
+  skips both. Keep the two conditions symmetric.
+- The actionlint installer is downloaded to a file (`curl -fsSL -o`) and then run, never run
+  through process substitution (`bash <(curl ...)`), which hides download errors.
+- Each tool step touches `$RUNNER_TEMP/verify-workflows/ran-<tool>` just before starting the
+  tool. This is a test hook (see Tests); keep it.
 - Tools are installed under `RUNNER_TEMP`, never in the workspace. The action must leave
   `git status` clean.
 - `paths` is newline-separated and read line by line, never word-split or globbed. Use the
@@ -106,6 +113,11 @@ Conventions:
   self-checked): `valid/ok.yaml`, `actionlint-error.yaml` (rejected by actionlint only),
   `zizmor-error.yaml` (rejected by zizmor only), `dir with space/ok.yaml`. Keep each bad fixture
   failing for exactly one tool.
+- A negative test needs a positive run (valid fixture, expected success) on the same runner
+  before it, so an install problem fails there and the negative run cannot pass for the
+  wrong reason.
+- `test-inputs` uses explicit newline-separated files in `paths`, never globs (they are not
+  expanded). `test-both-tools-run` checks the `ran-<tool>` marker files.
 - Failure paths are tested with `continue-on-error: true`, an `id`, and a step asserting
   `steps.<id>.outcome`.
 - Every new or changed input needs a job in `ci-action.yaml` exercising it (including the

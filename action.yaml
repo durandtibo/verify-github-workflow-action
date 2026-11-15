@@ -11,8 +11,8 @@ inputs:
   paths:
     description: >
       Newline-separated list of workflow files to verify. Paths are passed as is (no glob
-      expansion, spaces are preserved). Empty (default) verifies the workflows in
-      `.github/workflows`.
+      expansion: glob patterns are not expanded, spaces are preserved). Empty (default)
+      verifies the workflows in `.github/workflows`.
     required: false
     default: ""
 

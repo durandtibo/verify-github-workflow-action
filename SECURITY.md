@@ -7,7 +7,6 @@ security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
 | 0.0.x   | :white_check_mark: |
 
 ## Reporting a Vulnerability
@@ -54,7 +53,7 @@ After submitting a vulnerability report:
 
 When using this action, we recommend:
 
-1. **Pin to Specific Versions**: Use a specific version tag (e.g., `@v0.1.0`), ideally its commit SHA, instead of
+1. **Pin to Specific Versions**: Use a specific version tag (e.g., `@v0.0.3`), ideally its commit SHA, instead of
    `@main` to avoid unexpected changes.
 
 2. **Review Changes**: When updating to a new version, review the changes in the release
@@ -75,7 +74,8 @@ This action includes the following security measures:
 
 - **Pinned installer**: actionlint is installed with the official download script of the
   actionlint repository, pinned to a release commit SHA (never `main`). The script
-  downloads the release archive over HTTPS from GitHub releases.
+  downloads the release archive over HTTPS from GitHub releases. The script is first
+  downloaded to a file (so a download error fails the step) before it is run.
 
 - **Pinned tool versions**: the default versions of actionlint and zizmor are exact
   versions, bumped on each release of this action. `latest` is opt-in.
