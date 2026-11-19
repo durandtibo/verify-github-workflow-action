@@ -1,7 +1,26 @@
-# Workflow testing the action from the current repository code (uses: ./)
-# on multiple operating systems and with different input combinations. It also runs the
-# action on invalid fixtures (tests/fixtures) and asserts that it fails when it must, so a
-# regression to "always green" is caught.
+# Workflow testing the action in a real workflow. One file tests both versions:
+#   - use-released: false (default, called by ci.yaml): the action from the current checkout
+#     (uses: ./), i.e. the version that is not released yet.
+#   - use-released: true (called by nightly.yaml): the latest released action, to catch
+#     regressions in what consumers pick up. Update the pinned release below when a new
+#     version is released (bot-pin-action.yaml does it).
+# Every job has one step per version, selected by `if`, and one shared verify step that calls
+# dev/check_action_case.sh, so the two runs cannot drift apart.
+#
+# The tools are downloaded at each run, so a nightly failure that does not reproduce on the
+# current checkout can come from upstream (actionlint, zizmor, the runner image).
+#
+# Two levels of tests:
+#   - general behaviour (`test`): the default usage, on every OS of the matrix (os_matrix)
+#   - edge cases (`test-cases`, `test-cases-os`): one row of tests/action_cases.json per matrix
+#     cell. A row with "os": "latest" depends on the OS (xargs, bash, paths: GNU vs BSD) and
+#     runs on os_latest (Linux and macOS); the others run on one runner (ubuntu-latest).
+#     A new case is a new row, not a new job. A row has "released": false until the last
+#     release has the feature (the released run skips those rows). A row that does not expect a
+#     success follows a positive run on the same runner, so that it cannot fail for the wrong reason.
+#
+# The input defaults in the `with:` blocks below must stay equal to the defaults of action.yaml
+# (an input cannot be left unset conditionally): update them on each release.
 
 name: Test Action
 on:
@@ -9,13 +28,58 @@ on:
     inputs:
       test-matrix:
         description: "JSON test matrix from lib-get-test-matrix.yaml, loaded once by the caller"
-        required: true
+        required: false
         type: string
+        default: ""
+      use-released:
+        description: "Test the latest released action instead of the current checkout"
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      use-released:
+        description: "Test the latest released action instead of the current checkout"
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
 jobs:
+  # Only for a manual run: the callers pass the matrix they loaded once
+  get-matrix:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    uses: ./.github/workflows/lib-get-test-matrix.yaml
+    permissions:
+      contents: read
+
+  # The cases of the edge case tests, as two matrices (one runner, and os_latest)
+  get-cases:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      cases: ${{ steps.cases.outputs.cases }}
+      cases_os: ${{ steps.cases.outputs.cases_os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Read the cases
+        id: cases
+        run: |
+          set -euo pipefail
+          echo "cases=$(jq -c '[.[] | select(.os != "latest")]' tests/action_cases.json)" >> "$GITHUB_OUTPUT"
+          echo "cases_os=$(jq -c '[.[] | select(.os == "latest")]' tests/action_cases.json)" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+  # General behaviour: the default usage on every OS of the matrix
   test:
+    needs: get-matrix
+    if: ${{ !cancelled() && (needs.get-matrix.result == 'success' || needs.get-matrix.result == 'skipped') }}
     permissions:
       contents: read
     runs-on: ${{ matrix.os }}
@@ -24,343 +88,138 @@ jobs:
       max-parallel: 8
       fail-fast: false
       matrix:
-        os: ${{ fromJson(inputs.test-matrix).os_matrix }}
+        os: ${{ fromJson(inputs.test-matrix || needs.get-matrix.outputs.test_matrix).os_matrix }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Verify GitHub Workflows
-        uses: ./
-
-  test-inputs:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Custom paths (explicit files: globs are not expanded), versions and flags.
-      # The zizmor version is an exact older release, intentionally different from the
-      # default in action.yaml.
-      - name: Verify GitHub Workflows
-        uses: ./
-        with:
-          paths: |
-            .github/workflows/ci.yaml
-            .github/workflows/ci-action.yaml
-          actionlint-version: "1.7.12"
-          actionlint-flags: "-format '{{json .}}'"
-          zizmor-version: "1.31.1"
-          zizmor-flags: "--no-progress"
-
-  test-actionlint-disabled:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Only zizmor runs
-      - name: Verify GitHub Workflows
-        uses: ./
-        with:
-          actionlint: "false"
-
-  test-zizmor-disabled:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Only actionlint runs
-      - name: Verify GitHub Workflows
-        uses: ./
-        with:
-          zizmor: "false"
-
-  test-all-disabled:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Nothing runs, the action must still succeed
-      - name: Verify GitHub Workflows
-        uses: ./
-        with:
-          actionlint: "false"
-          zizmor: "false"
-
-  # The action must succeed or fail depending on the fixture and on which tools are enabled.
-  # A positive run on the valid fixture comes first on the same runner: if the install were
-  # broken it would fail there, so a failing negative run can only come from a finding or
-  # a rejected input.
-  test-fixtures:
-    name: test-fixtures (${{ matrix.name }})
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: valid fixture passes
-            paths: tests/fixtures/valid/ok.yaml
-            actionlint: "true"
-            zizmor: "true"
-            expected: success
-          - name: invalid actionlint boolean fails
-            paths: tests/fixtures/valid/ok.yaml
-            actionlint: "yes"
-            zizmor: "true"
-            expected: failure
-          - name: invalid zizmor boolean fails
-            paths: tests/fixtures/valid/ok.yaml
-            actionlint: "true"
-            zizmor: "yes"
-            expected: failure
-          - name: actionlint error is caught
-            paths: tests/fixtures/actionlint-error.yaml
-            actionlint: "true"
-            zizmor: "true"
-            expected: failure
-          - name: actionlint error is ignored when actionlint is disabled
-            paths: tests/fixtures/actionlint-error.yaml
-            actionlint: "false"
-            zizmor: "true"
-            expected: success
-          - name: zizmor error is caught
-            paths: tests/fixtures/zizmor-error.yaml
-            actionlint: "true"
-            zizmor: "true"
-            expected: failure
-          - name: zizmor error is ignored when zizmor is disabled
-            paths: tests/fixtures/zizmor-error.yaml
-            actionlint: "true"
-            zizmor: "false"
-            expected: success
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Positive control: the tools install and accept the valid fixture
-      - name: Verify the valid fixture
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-
-      - name: Verify GitHub Workflows
-        id: action
+      - name: Verify GitHub Workflows (local)
+        id: local
+        if: ${{ !inputs.use-released }}
         continue-on-error: true
         uses: ./
-        with:
-          paths: ${{ matrix.paths }}
-          actionlint: ${{ matrix.actionlint }}
-          zizmor: ${{ matrix.zizmor }}
-
-      # Fail if the action did not end with the expected outcome
-      - name: Check the outcome
+      - name: Verify GitHub Workflows (released)
+        id: released
+        if: ${{ inputs.use-released }}
+        continue-on-error: true
+        uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
+      - name: Check the default usage
         env:
-          OUTCOME: ${{ steps.action.outcome }}
-          EXPECTED: ${{ matrix.expected }}
-        run: |
-          set -euo pipefail
-          echo "outcome=$OUTCOME expected=$EXPECTED"
-          [ "$OUTCOME" = "$EXPECTED" ]
+          CASE: '{"id":"default","expect":"success","markers":"both"}'
+          OUTCOME: ${{ steps.local.outcome == 'skipped' && steps.released.outcome || steps.local.outcome }}
+          # The pinned release (v0.0.3) does not create the ran-<tool> markers yet
+          CHECK_MARKERS: ${{ !inputs.use-released }}
+        run: ./dev/check_action_case.sh
+        shell: bash
 
-  # Failure detection must work on every OS (xargs, arrays and installers differ per OS).
-  # The positive run comes first on the same runner, so a failed install fails the job there
-  # instead of passing the negative runs for the wrong reason.
-  test-failure-os:
+  # Edge cases that do not depend on the OS: one row of tests/action_cases.json per cell, on one runner
+  test-cases:
+    needs: [get-matrix, get-cases]
+    if: ${{ !cancelled() && needs.get-cases.result == 'success' && (needs.get-matrix.result == 'success' || needs.get-matrix.result == 'skipped') }}
     permissions:
+      actions: read # for the github-token case (zizmor online audits)
       contents: read
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
       max-parallel: 8
       fail-fast: false
       matrix:
-        os: ${{ fromJson(inputs.test-matrix).os_matrix }}
+        case: ${{ fromJson(needs.get-cases.outputs.cases) }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
         with:
           persist-credentials: false
 
-      # Positive control: the tools install and accept the valid fixture
-      - name: Verify the valid fixture
+      # A row that does not expect a success follows a positive run on the same runner, so that the
+      # install cannot be the reason of the failure
+      - name: Positive control before a failure case (local)
+        if: ${{ !inputs.use-released && matrix.case.expect != 'success' }}
         uses: ./
         with:
           paths: tests/fixtures/valid/ok.yaml
-
-      - name: Verify the actionlint error fixture
-        id: actionlint-error
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/actionlint-error.yaml
-
-      - name: Verify the zizmor error fixture
-        id: zizmor-error
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/zizmor-error.yaml
-
-      # Both fixtures must have been rejected
-      - name: Check the outcomes
-        env:
-          ACTIONLINT_OUTCOME: ${{ steps.actionlint-error.outcome }}
-          ZIZMOR_OUTCOME: ${{ steps.zizmor-error.outcome }}
-        run: |
-          set -euo pipefail
-          echo "actionlint fixture: $ACTIONLINT_OUTCOME, zizmor fixture: $ZIZMOR_OUTCOME"
-          [ "$ACTIONLINT_OUTCOME" = "failure" ]
-          [ "$ZIZMOR_OUTCOME" = "failure" ]
-
-  # Both tools must run in the same run even when the first one fails, so one run reports
-  # all the problems. Each tool step leaves a marker file in RUNNER_TEMP once started.
-  test-both-tools-run:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Positive control: the tools install and accept the valid fixture
-      - name: Verify the valid fixture
-        uses: ./
+      - name: Positive control before a failure case (released)
+        if: ${{ inputs.use-released && matrix.case.released && matrix.case.expect != 'success' }}
+        uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
         with:
           paths: tests/fixtures/valid/ok.yaml
 
-      # The markers of the control run must not leak into the assertion below
-      - name: Remove the markers
+      # The markers of the control run must not leak into the assertions of the case
+      - name: Reset the markers
         run: |
           set -euo pipefail
           rm -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" "$RUNNER_TEMP/verify-workflows/ran-zizmor"
+        shell: bash
 
-      - name: Verify both error fixtures at once
-        id: both-errors
+      # Some rows verify the default directory (no paths): copy a fixture into it, in the
+      # checkout of this job only
+      - name: Add the fixture to the default directory
+        if: ${{ matrix.case.setup && (!inputs.use-released || matrix.case.released) }}
+        env:
+          FIXTURE: ${{ matrix.case.setup }}
+        run: |
+          set -euo pipefail
+          cp "$FIXTURE" .github/workflows/zz-fixture.yaml
+        shell: bash
+
+      - name: Run the case (local)
+        id: local
+        if: ${{ !inputs.use-released }}
         continue-on-error: true
         uses: ./
         with:
-          paths: |
-            tests/fixtures/actionlint-error.yaml
-            tests/fixtures/zizmor-error.yaml
+          paths: ${{ matrix.case.inputs['paths'] || '' }}
+          actionlint: ${{ matrix.case.inputs['actionlint'] || 'true' }}
+          actionlint-version: ${{ matrix.case.inputs['actionlint-version'] || '1.7.12' }}
+          actionlint-flags: ${{ matrix.case.inputs['actionlint-flags'] || '' }}
+          zizmor: ${{ matrix.case.inputs['zizmor'] || 'true' }}
+          zizmor-version: ${{ matrix.case.inputs['zizmor-version'] || '1.32.0' }}
+          zizmor-flags: ${{ matrix.case.inputs['zizmor-flags'] || '' }}
+          github-token: ${{ matrix.case.inputs['github-token'] == 'workflow' && github.token || matrix.case.inputs['github-token'] || '' }}
+      # The pinned release (v0.0.3) has other inputs (version, flags): the rows that need the
+      # current inputs have "released": false. Once the pinned release is v0.1.0, flip them.
+      - name: Run the case (released)
+        id: released
+        if: ${{ inputs.use-released && matrix.case.released }}
+        continue-on-error: true
+        uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
+        with:
+          paths: ${{ matrix.case.inputs['paths'] || '' }}
+          actionlint: ${{ matrix.case.inputs['actionlint'] || 'true' }}
+          actionlint-version: ${{ matrix.case.inputs['actionlint-version'] || '1.7.12' }}
+          actionlint-flags: ${{ matrix.case.inputs['actionlint-flags'] || '' }}
+          zizmor: ${{ matrix.case.inputs['zizmor'] || 'true' }}
+          zizmor-version: ${{ matrix.case.inputs['zizmor-version'] || '1.32.0' }}
+          zizmor-flags: ${{ matrix.case.inputs['zizmor-flags'] || '' }}
+          github-token: ${{ matrix.case.inputs['github-token'] == 'workflow' && github.token || matrix.case.inputs['github-token'] || '' }}
 
-      # The action fails and both tools ran
-      - name: Check the outcome and the markers
+      - name: Remove the fixture from the default directory
+        if: ${{ always() && matrix.case.setup && (!inputs.use-released || matrix.case.released) }}
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/zz-fixture.yaml
+        shell: bash
+
+      - name: Check the case
+        if: ${{ !inputs.use-released || matrix.case.released }}
         env:
-          OUTCOME: ${{ steps.both-errors.outcome }}
-        run: |
-          set -euo pipefail
-          echo "outcome=$OUTCOME"
-          [ "$OUTCOME" = "failure" ]
-          [ -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
-          [ -f "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
+          CASE: ${{ toJson(matrix.case) }}
+          OUTCOME: ${{ steps.local.outcome == 'skipped' && steps.released.outcome || steps.local.outcome }}
+          # The pinned release (v0.0.3) does not create the ran-<tool> markers yet
+          CHECK_MARKERS: ${{ !inputs.use-released }}
+        run: ./dev/check_action_case.sh
+        shell: bash
 
-  # Paths are newline-separated and passed as is: spaces are preserved, several paths work,
-  # and the tools must not leave files in the checkout
-  test-paths:
+  # Edge cases that depend on the OS (failure detection, flags, paths): one row per cell, on os_latest
+  test-cases-os:
+    needs: [get-matrix, get-cases]
+    if: ${{ !cancelled() && needs.get-cases.result == 'success' && (needs.get-matrix.result == 'success' || needs.get-matrix.result == 'skipped') }}
     permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Verify a path containing a space
-        uses: ./
-        with:
-          paths: tests/fixtures/dir with space/ok.yaml
-
-      - name: Verify several paths
-        uses: ./
-        with:
-          paths: |
-            tests/fixtures/valid/ok.yaml
-            tests/fixtures/dir with space/ok.yaml
-
-      # The installers must not write into the checkout
-      - name: Check the workspace is clean
-        run: |
-          set -euo pipefail
-          status="$(git status --porcelain)"
-          echo "$status"
-          [ -z "$status" ]
-
-  # `latest` for both tools, and a user-chosen zizmor format (no --format=github added)
-  test-latest-and-format:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Verify GitHub Workflows
-        uses: ./
-        with:
-          actionlint-version: latest
-          zizmor-version: latest
-          zizmor-flags: --format=plain --no-progress
-
-  # zizmor online audits with the workflow token (read-only permissions are enough)
-  test-github-token:
-    permissions:
-      contents: read
-      actions: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Verify GitHub Workflows
-        uses: ./
-        with:
-          github-token: ${{ github.token }}
-
-  # Flags are tokenized with xargs: quoting is honored (a flag with a space stays one token),
-  # flags really reach the tools, an unknown flag fails, and shell syntax in the flags is
-  # never executed. Runs on every OS because xargs differs between GNU and BSD.
-  test-flags-os:
-    permissions:
+      actions: read # for the github-token case (zizmor online audits)
       contents: read
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
@@ -368,354 +227,90 @@ jobs:
       max-parallel: 8
       fail-fast: false
       matrix:
-        os: ${{ fromJson(inputs.test-matrix).os_matrix }}
+        os: ${{ fromJson(inputs.test-matrix || needs.get-matrix.outputs.test_matrix).os_latest }}
+        case: ${{ fromJson(needs.get-cases.outputs.cases_os) }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
         with:
           persist-credentials: false
 
-      # Positive control: the tools install and accept the valid fixture
-      - name: Verify the valid fixture
+      # A row that does not expect a success follows a positive run on the same runner, so that the
+      # install cannot be the reason of the failure
+      - name: Positive control before a failure case (local)
+        if: ${{ !inputs.use-released && matrix.case.expect != 'success' }}
         uses: ./
         with:
           paths: tests/fixtures/valid/ok.yaml
-
-      # The quoted pattern contains a space: split in two tokens it would make actionlint
-      # fail (a stray argument), so success proves the quoting is honored and the flag applied
-      - name: actionlint ignores the error through a quoted flag
-        uses: ./
-        with:
-          paths: tests/fixtures/actionlint-error.yaml
-          zizmor: "false"
-          actionlint-flags: "-ignore '.+ .+'"
-
-      # The flag is given with a space between name and value: a mishandled value would be an
-      # invalid argument and fail the run.
-      - name: zizmor honors a flag with a separate value
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          actionlint: "false"
-          zizmor-flags: "--min-severity high"
-
-      # A user-chosen format given as two tokens must not get --format=github added
-      - name: zizmor accepts a separate --format value
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          actionlint: "false"
-          zizmor-flags: "--format plain"
-
-      - name: Unknown actionlint flag
-        id: bad-actionlint-flag
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          zizmor: "false"
-          actionlint-flags: "--definitely-not-a-flag"
-
-      - name: Unknown zizmor flag
-        id: bad-zizmor-flag
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          actionlint: "false"
-          zizmor-flags: "--definitely-not-a-flag"
-
-      # Shell syntax in the flags is data, never code. The runs may fail (junk arguments),
-      # only the absence of side effects matters.
-      - name: Injection through actionlint-flags
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          zizmor: "false"
-          actionlint-flags: "$(touch pwned-actionlint) `touch pwned-actionlint` ; touch pwned-actionlint"
-
-      - name: Injection through zizmor-flags
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          actionlint: "false"
-          zizmor-flags: "$(touch pwned-zizmor) `touch pwned-zizmor` ; touch pwned-zizmor"
-
-      - name: Check the outcomes and that nothing was executed
-        env:
-          BAD_ACTIONLINT_FLAG: ${{ steps.bad-actionlint-flag.outcome }}
-          BAD_ZIZMOR_FLAG: ${{ steps.bad-zizmor-flag.outcome }}
-        run: |
-          set -euo pipefail
-          echo "actionlint bad flag: $BAD_ACTIONLINT_FLAG, zizmor bad flag: $BAD_ZIZMOR_FLAG"
-          [ "$BAD_ACTIONLINT_FLAG" = "failure" ]
-          [ "$BAD_ZIZMOR_FLAG" = "failure" ]
-          [ ! -e pwned-actionlint ]
-          [ ! -e pwned-zizmor ]
-          status="$(git status --porcelain)"
-          echo "$status"
-          [ -z "$status" ]
-
-  # Paths edge cases: a missing file fails, glob characters are not expanded, blank lines,
-  # surrounding blank lines and several files are fine. Each negative case is preceded by
-  # the positive control of the job.
-  test-paths-edge-cases:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Positive control: the tools install and accept the valid fixture
-      - name: Verify the valid fixture
-        uses: ./
+      - name: Positive control before a failure case (released)
+        if: ${{ inputs.use-released && matrix.case.released && matrix.case.expect != 'success' }}
+        uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
         with:
           paths: tests/fixtures/valid/ok.yaml
 
-      # Blank lines are skipped, not passed as empty arguments
-      - name: Blank lines in paths
-        uses: ./
-        with:
-          paths: |
-
-            tests/fixtures/valid/ok.yaml
-
-            tests/fixtures/dir with space/ok.yaml
-
-      - name: Missing file
-        id: missing
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/does-not-exist.yaml
-
-      # The glob would match the valid fixture: if it were expanded the run would succeed
-      - name: Glob is not expanded
-        id: glob
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/*.yaml
-
-      # A valid path next to an invalid one: the whole run fails
-      - name: One bad path among valid ones
-        id: mixed
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: |
-            tests/fixtures/valid/ok.yaml
-            tests/fixtures/actionlint-error.yaml
-
-      - name: Check the outcomes
-        env:
-          MISSING: ${{ steps.missing.outcome }}
-          GLOB: ${{ steps.glob.outcome }}
-          MIXED: ${{ steps.mixed.outcome }}
-        run: |
-          set -euo pipefail
-          echo "missing=$MISSING glob=$GLOB mixed=$MIXED"
-          [ "$MISSING" = "failure" ]
-          [ "$GLOB" = "failure" ]
-          [ "$MIXED" = "failure" ]
-
-  # Without `paths` the action verifies .github/workflows. Bad workflows are copied there
-  # (the checkout of this job only) to prove that the default discovery finds and rejects
-  # them, for each tool separately.
-  test-default-discovery:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Positive control: the repository workflows are valid
-      - name: Verify the default directory
-        uses: ./
-
-      - name: Add an actionlint error to the default directory
-        run: |
-          set -euo pipefail
-          cp tests/fixtures/actionlint-error.yaml .github/workflows/zz-actionlint-error.yaml
-
-      - name: Default discovery rejects the actionlint error
-        id: actionlint-found
-        continue-on-error: true
-        uses: ./
-
-      - name: Default discovery ignores it when actionlint is disabled
-        id: actionlint-disabled
-        continue-on-error: true
-        uses: ./
-        with:
-          actionlint: "false"
-
-      - name: Replace it by a zizmor error
-        run: |
-          set -euo pipefail
-          rm .github/workflows/zz-actionlint-error.yaml
-          cp tests/fixtures/zizmor-error.yaml .github/workflows/zz-zizmor-error.yaml
-
-      - name: Default discovery rejects the zizmor error
-        id: zizmor-found
-        continue-on-error: true
-        uses: ./
-
-      - name: Default discovery ignores it when zizmor is disabled
-        id: zizmor-disabled
-        continue-on-error: true
-        uses: ./
-        with:
-          zizmor: "false"
-
-      - name: Check the outcomes
-        env:
-          ACTIONLINT_FOUND: ${{ steps.actionlint-found.outcome }}
-          ACTIONLINT_DISABLED: ${{ steps.actionlint-disabled.outcome }}
-          ZIZMOR_FOUND: ${{ steps.zizmor-found.outcome }}
-          ZIZMOR_DISABLED: ${{ steps.zizmor-disabled.outcome }}
-        run: |
-          set -euo pipefail
-          echo "$ACTIONLINT_FOUND $ACTIONLINT_DISABLED $ZIZMOR_FOUND $ZIZMOR_DISABLED"
-          [ "$ACTIONLINT_FOUND" = "failure" ]
-          [ "$ACTIONLINT_DISABLED" = "success" ]
-          [ "$ZIZMOR_FOUND" = "failure" ]
-          [ "$ZIZMOR_DISABLED" = "success" ]
-
-  # The requested versions are the installed ones, and an unknown version fails.
-  test-versions:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # An exact older actionlint release, different from the default in action.yaml
-      - name: Verify with an exact actionlint version
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          zizmor: "false"
-          actionlint-version: "1.7.11"
-
-      - name: Check the installed actionlint version
-        run: |
-          set -euo pipefail
-          version="$("$RUNNER_TEMP/verify-workflows/bin/actionlint" -version | head -n 1)"
-          echo "$version"
-          [ "$version" = "1.7.11" ]
-
-      - name: Unknown actionlint version
-        id: bad-actionlint-version
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          zizmor: "false"
-          actionlint-version: "0.0.0"
-
-      - name: Unknown zizmor version
-        id: bad-zizmor-version
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          actionlint: "false"
-          zizmor-version: "0.0.0"
-
-      - name: Check the outcomes
-        env:
-          BAD_ACTIONLINT: ${{ steps.bad-actionlint-version.outcome }}
-          BAD_ZIZMOR: ${{ steps.bad-zizmor-version.outcome }}
-        run: |
-          set -euo pipefail
-          echo "actionlint=$BAD_ACTIONLINT zizmor=$BAD_ZIZMOR"
-          [ "$BAD_ACTIONLINT" = "failure" ]
-          [ "$BAD_ZIZMOR" = "failure" ]
-
-  # A disabled tool never starts, and a rejected input skips both tools (Prepare fails).
-  # Uses the ran-<tool> markers, removed before each run.
-  test-skipped-tools:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # Positive control: both tools run on the valid fixture and leave their markers
-      - name: Verify the valid fixture
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-
-      - name: Check both markers exist
-        run: |
-          set -euo pipefail
-          [ -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
-          [ -f "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
-
-      - name: Remove the markers
+      # The markers of the control run must not leak into the assertions of the case
+      - name: Reset the markers
         run: |
           set -euo pipefail
           rm -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" "$RUNNER_TEMP/verify-workflows/ran-zizmor"
+        shell: bash
 
-      - name: Verify with actionlint disabled
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          actionlint: "false"
-
-      - name: Check only zizmor ran
+      # Some rows verify the default directory (no paths): copy a fixture into it, in the
+      # checkout of this job only
+      - name: Add the fixture to the default directory
+        if: ${{ matrix.case.setup && (!inputs.use-released || matrix.case.released) }}
+        env:
+          FIXTURE: ${{ matrix.case.setup }}
         run: |
           set -euo pipefail
-          [ ! -e "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
-          [ -f "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
-          rm -f "$RUNNER_TEMP/verify-workflows/ran-zizmor"
+          cp "$FIXTURE" .github/workflows/zz-fixture.yaml
+        shell: bash
 
-      - name: Verify with zizmor disabled
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-          zizmor: "false"
-
-      - name: Check only actionlint ran
-        run: |
-          set -euo pipefail
-          [ -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
-          [ ! -e "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
-          rm -f "$RUNNER_TEMP/verify-workflows/ran-actionlint"
-
-      - name: Verify with an invalid boolean
-        id: invalid
+      - name: Run the case (local)
+        id: local
+        if: ${{ !inputs.use-released }}
         continue-on-error: true
         uses: ./
         with:
-          paths: tests/fixtures/valid/ok.yaml
-          zizmor: "yes"
+          paths: ${{ matrix.case.inputs['paths'] || '' }}
+          actionlint: ${{ matrix.case.inputs['actionlint'] || 'true' }}
+          actionlint-version: ${{ matrix.case.inputs['actionlint-version'] || '1.7.12' }}
+          actionlint-flags: ${{ matrix.case.inputs['actionlint-flags'] || '' }}
+          zizmor: ${{ matrix.case.inputs['zizmor'] || 'true' }}
+          zizmor-version: ${{ matrix.case.inputs['zizmor-version'] || '1.32.0' }}
+          zizmor-flags: ${{ matrix.case.inputs['zizmor-flags'] || '' }}
+          github-token: ${{ matrix.case.inputs['github-token'] == 'workflow' && github.token || matrix.case.inputs['github-token'] || '' }}
+      # The pinned release (v0.0.3) has other inputs (version, flags): the rows that need the
+      # current inputs have "released": false. Once the pinned release is v0.1.0, flip them.
+      - name: Run the case (released)
+        id: released
+        if: ${{ inputs.use-released && matrix.case.released }}
+        continue-on-error: true
+        uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
+        with:
+          paths: ${{ matrix.case.inputs['paths'] || '' }}
+          actionlint: ${{ matrix.case.inputs['actionlint'] || 'true' }}
+          actionlint-version: ${{ matrix.case.inputs['actionlint-version'] || '1.7.12' }}
+          actionlint-flags: ${{ matrix.case.inputs['actionlint-flags'] || '' }}
+          zizmor: ${{ matrix.case.inputs['zizmor'] || 'true' }}
+          zizmor-version: ${{ matrix.case.inputs['zizmor-version'] || '1.32.0' }}
+          zizmor-flags: ${{ matrix.case.inputs['zizmor-flags'] || '' }}
+          github-token: ${{ matrix.case.inputs['github-token'] == 'workflow' && github.token || matrix.case.inputs['github-token'] || '' }}
 
-      - name: Check the action failed and no tool ran
-        env:
-          OUTCOME: ${{ steps.invalid.outcome }}
+      - name: Remove the fixture from the default directory
+        if: ${{ always() && matrix.case.setup && (!inputs.use-released || matrix.case.released) }}
         run: |
           set -euo pipefail
-          [ "$OUTCOME" = "failure" ]
-          [ ! -e "$RUNNER_TEMP/verify-workflows/ran-actionlint" ]
-          [ ! -e "$RUNNER_TEMP/verify-workflows/ran-zizmor" ]
+          rm -f .github/workflows/zz-fixture.yaml
+        shell: bash
+
+      - name: Check the case
+        if: ${{ !inputs.use-released || matrix.case.released }}
+        env:
+          CASE: ${{ toJson(matrix.case) }}
+          OUTCOME: ${{ steps.local.outcome == 'skipped' && steps.released.outcome || steps.local.outcome }}
+          # The pinned release (v0.0.3) does not create the ran-<tool> markers yet
+          CHECK_MARKERS: ${{ !inputs.use-released }}
+        run: ./dev/check_action_case.sh
+        shell: bash

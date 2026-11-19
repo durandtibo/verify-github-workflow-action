@@ -1,5 +1,6 @@
 # Nightly workflow testing the latest released action, to catch regressions in
 # what consumers pick up. The current (unreleased) code is tested nightly by ci.yaml.
+# It calls ci-action.yaml (the same cases as ci.yaml) with use-released: true.
 #
 # Permissions are set at the job level, not the workflow level.
 
@@ -22,8 +23,10 @@ jobs:
   # Test the latest released action
   test-released:
     needs: get-matrix
-    uses: ./.github/workflows/nightly-test-released.yaml
+    uses: ./.github/workflows/ci-action.yaml
     with:
+      use-released: true
       test-matrix: ${{ needs.get-matrix.outputs.test_matrix }}
     permissions:
+      actions: read # needed by the github-token case in ci-action.yaml
       contents: read

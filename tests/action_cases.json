@@ -1,0 +1,328 @@
+[
+  {
+    "id": "valid-fixture",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml"
+    },
+    "expect": "success",
+    "markers": "both",
+    "released": false
+  },
+  {
+    "id": "invalid-actionlint-boolean",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "actionlint": "yes"
+    },
+    "expect": "failure",
+    "markers": "none",
+    "released": false
+  },
+  {
+    "id": "invalid-zizmor-boolean",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "zizmor": "yes"
+    },
+    "expect": "failure",
+    "markers": "none",
+    "released": false
+  },
+  {
+    "id": "actionlint-error-caught",
+    "inputs": {
+      "paths": "tests/fixtures/actionlint-error.yaml"
+    },
+    "expect": "failure",
+    "markers": "both",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "actionlint-error-actionlint-disabled",
+    "inputs": {
+      "paths": "tests/fixtures/actionlint-error.yaml",
+      "actionlint": "false"
+    },
+    "expect": "success",
+    "markers": "zizmor",
+    "released": false
+  },
+  {
+    "id": "zizmor-error-caught",
+    "inputs": {
+      "paths": "tests/fixtures/zizmor-error.yaml"
+    },
+    "expect": "failure",
+    "markers": "both",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "zizmor-error-zizmor-disabled",
+    "inputs": {
+      "paths": "tests/fixtures/zizmor-error.yaml",
+      "zizmor": "false"
+    },
+    "expect": "success",
+    "markers": "actionlint",
+    "released": false
+  },
+  {
+    "id": "both-errors-both-tools-run",
+    "inputs": {
+      "paths": "tests/fixtures/actionlint-error.yaml\ntests/fixtures/zizmor-error.yaml"
+    },
+    "expect": "failure",
+    "markers": "both",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "all-disabled",
+    "inputs": {
+      "actionlint": "false",
+      "zizmor": "false"
+    },
+    "expect": "success",
+    "markers": "none",
+    "released": false
+  },
+  {
+    "id": "custom-paths-versions-flags",
+    "inputs": {
+      "paths": ".github/workflows/ci.yaml\n.github/workflows/ci-action.yaml",
+      "actionlint-version": "1.7.12",
+      "actionlint-flags": "-format '{{json .}}'",
+      "zizmor-version": "1.31.1",
+      "zizmor-flags": "--no-progress"
+    },
+    "expect": "success",
+    "markers": "both",
+    "released": false
+  },
+  {
+    "id": "latest-versions-and-format",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "actionlint-version": "latest",
+      "zizmor-version": "latest",
+      "zizmor-flags": "--format=plain --no-progress"
+    },
+    "expect": "success",
+    "markers": "both",
+    "released": false
+  },
+  {
+    "id": "exact-actionlint-version",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "zizmor": "false",
+      "actionlint-version": "1.7.11"
+    },
+    "expect": "success",
+    "markers": "actionlint",
+    "actionlint-version": "1.7.11",
+    "released": false
+  },
+  {
+    "id": "unknown-actionlint-version",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "zizmor": "false",
+      "actionlint-version": "0.0.0"
+    },
+    "expect": "failure",
+    "markers": "none",
+    "released": false
+  },
+  {
+    "id": "unknown-zizmor-version",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "actionlint": "false",
+      "zizmor-version": "0.0.0"
+    },
+    "expect": "failure",
+    "markers": "zizmor",
+    "released": false
+  },
+  {
+    "id": "path-with-space",
+    "inputs": {
+      "paths": "tests/fixtures/dir with space/ok.yaml"
+    },
+    "expect": "success",
+    "markers": "both",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "several-paths-and-blank-lines",
+    "inputs": {
+      "paths": "\ntests/fixtures/valid/ok.yaml\n\ntests/fixtures/dir with space/ok.yaml\n"
+    },
+    "expect": "success",
+    "markers": "both",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "missing-path",
+    "inputs": {
+      "paths": "tests/fixtures/does-not-exist.yaml"
+    },
+    "expect": "failure",
+    "markers": "both",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "glob-not-expanded",
+    "inputs": {
+      "paths": "tests/fixtures/valid/*.yaml"
+    },
+    "expect": "failure",
+    "markers": "both",
+    "released": false
+  },
+  {
+    "id": "one-bad-path-among-valid",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml\ntests/fixtures/actionlint-error.yaml"
+    },
+    "expect": "failure",
+    "markers": "both",
+    "released": false
+  },
+  {
+    "id": "quoted-actionlint-flag",
+    "inputs": {
+      "paths": "tests/fixtures/actionlint-error.yaml",
+      "zizmor": "false",
+      "actionlint-flags": "-ignore '.+ .+'"
+    },
+    "expect": "success",
+    "markers": "actionlint",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "zizmor-flag-separate-value",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "actionlint": "false",
+      "zizmor-flags": "--min-severity high"
+    },
+    "expect": "success",
+    "markers": "zizmor",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "zizmor-format-separate-value",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "actionlint": "false",
+      "zizmor-flags": "--format plain"
+    },
+    "expect": "success",
+    "markers": "zizmor",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "unknown-actionlint-flag",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "zizmor": "false",
+      "actionlint-flags": "--definitely-not-a-flag"
+    },
+    "expect": "failure",
+    "markers": "actionlint",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "unknown-zizmor-flag",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "actionlint": "false",
+      "zizmor-flags": "--definitely-not-a-flag"
+    },
+    "expect": "failure",
+    "markers": "zizmor",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "injection-actionlint-flags",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "zizmor": "false",
+      "actionlint-flags": "$(touch pwned) `touch pwned` ; touch pwned"
+    },
+    "expect": "any",
+    "markers": "actionlint",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "injection-zizmor-flags",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "actionlint": "false",
+      "zizmor-flags": "$(touch pwned) `touch pwned` ; touch pwned"
+    },
+    "expect": "any",
+    "markers": "zizmor",
+    "released": false,
+    "os": "latest"
+  },
+  {
+    "id": "default-discovery-actionlint-error",
+    "setup": "tests/fixtures/actionlint-error.yaml",
+    "inputs": {},
+    "expect": "failure",
+    "markers": "both",
+    "released": false
+  },
+  {
+    "id": "default-discovery-actionlint-error-actionlint-disabled",
+    "setup": "tests/fixtures/actionlint-error.yaml",
+    "inputs": {
+      "actionlint": "false"
+    },
+    "expect": "success",
+    "markers": "zizmor",
+    "released": false
+  },
+  {
+    "id": "default-discovery-zizmor-error",
+    "setup": "tests/fixtures/zizmor-error.yaml",
+    "inputs": {},
+    "expect": "failure",
+    "markers": "both",
+    "released": false
+  },
+  {
+    "id": "default-discovery-zizmor-error-zizmor-disabled",
+    "setup": "tests/fixtures/zizmor-error.yaml",
+    "inputs": {
+      "zizmor": "false"
+    },
+    "expect": "success",
+    "markers": "actionlint",
+    "released": false
+  },
+  {
+    "id": "github-token",
+    "inputs": {
+      "paths": "tests/fixtures/valid/ok.yaml",
+      "github-token": "workflow"
+    },
+    "expect": "success",
+    "markers": "both",
+    "released": false
+  }
+]
