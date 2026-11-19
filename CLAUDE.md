@@ -101,7 +101,8 @@ there is no unit test suite.
     `ci.yaml` calls it with `false` (the action from this checkout, not released yet);
     `nightly.yaml` calls it with `true` (the latest release, pinned). The `test` job runs the
     default usage on `os_matrix`. The cases of `tests/action_cases.json` run one per matrix cell:
-    the rows with `"os": "latest"` on `os_latest`, the others on `ubuntu-latest`. `get-cases`
+    the rows with `"os": "matrix"` on `os_matrix`, the rows with `"os": "latest"` on `os_latest`,
+    the others on `ubuntu-latest`. `get-cases`
     turns the file into one matrix cell per case and runner (one `test-cases` job);
     `dev/check_action_case.sh` asserts one case. The header of the workflow counts the cells.
   - `ci-docs.yaml`: `make check-readme-sync` (`dev/check_readme_sync.sh`) compares the inputs and
@@ -145,9 +146,10 @@ Conventions:
   wrong reason.
 - A new case is a row of `tests/action_cases.json`, not a new job: `id`, `inputs`, `expect`
   (`success`, `failure`, or `any` when only the side effects matter), `markers` (which tools must
-  have started, from their `ran-<tool>` files), `released`, and optionally `os` (`latest` when
-  the case depends on the OS), `setup` (a fixture copied into `.github/workflows` for the default
-  discovery) and `actionlint-version` (the installed version). `paths` uses explicit
+  have started, from their `ran-<tool>` files), `released`, and optionally `os` (`matrix` for
+  general behaviour that must work on every OS, `latest` when the case depends on the OS),
+  `setup` (a fixture copied into `.github/workflows` for the default discovery) and
+  `actionlint-version` (the installed version). `paths` uses explicit
   newline-separated files, never globs (they are not expanded).
 - The assertions live in `dev/check_action_case.sh`, shared by the local and the released runs:
   outcome, markers, installed version, clean `git status`, no `pwned` file (flag injection).

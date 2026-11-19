@@ -11,10 +11,12 @@
 # current checkout can come from upstream (actionlint, zizmor, the runner image).
 #
 # Two levels of tests:
-#   - general behaviour (`test`): the default usage, on every OS of the matrix (os_matrix)
-#   - edge cases (`test-cases`): one row of tests/action_cases.json per matrix cell. A row with
-#     "os": "latest" depends on the OS (xargs, bash, paths: GNU vs BSD) and runs on every
-#     os_latest runner (Linux and macOS); the others run on one runner (ubuntu-latest).
+#   - general behaviour: what must work on every OS of the matrix (os_matrix): the default usage
+#     (`test`), and the rows of tests/action_cases.json with "os": "matrix" (failure detection and
+#     flag tokenization, which differ per OS: xargs, bash)
+#   - edge cases (`test-cases`): the other rows, one per matrix cell. A row with "os": "latest"
+#     depends on the OS (xargs, bash, paths: GNU vs BSD) and runs on every os_latest runner
+#     (Linux and macOS); the others run on one runner (ubuntu-latest).
 #     A new case is a new row, not a new job. A row has "released": false until the last
 #     release has the feature (the released run skips those rows). A row that does not expect a
 #     success follows a positive run on the same runner, so that it cannot fail for the wrong reason.
@@ -23,10 +25,11 @@
 #   cells = len(os_matrix)                                  (test)
 #         + rows without "os"                               (test-cases, ubuntu-latest)
 #         + rows with "os": "latest" x len(os_latest)       (test-cases, Linux and macOS)
-#   With the 31 rows of tests/action_cases.json today (18 without "os", 13 with "os": "latest"
-#   and 2 runners in os_latest): 18 + 13 x 2 = 44 cells for test-cases. The jobs of a matrix
-#   run at most 8 at a time (max-parallel) and are bounded by timeout-minutes. Recount when a
-#   row or a runner is added.
+#         + rows with "os": "matrix" x len(os_matrix)       (test-cases, every runner)
+#   With the 31 rows of tests/action_cases.json today (18 without "os", 9 with "os": "latest" and
+#   4 with "os": "matrix"), 2 runners in os_latest and N runners in os_matrix:
+#   18 + 9 x 2 + 4 x N = 36 + 4 x N cells for test-cases. The jobs of a matrix run at most 8 at a
+#   time (max-parallel) and are bounded by timeout-minutes. Recount when a row or a runner is added.
 #
 # The input defaults in the `with:` blocks below must stay equal to the defaults of action.yaml
 # (an input cannot be left unset conditionally): update them on each release.
@@ -63,8 +66,9 @@ jobs:
     permissions:
       contents: read
 
-  # The cells of the edge case tests, one per case and per runner: a row with "os": "latest"
-  # runs on every os_latest runner, the others on ubuntu-latest
+  # The cells of the case tests, one per case and per runner: a row with "os": "matrix" runs on
+  # every os_matrix runner, a row with "os": "latest" on every os_latest runner, the others on
+  # ubuntu-latest
   get-cases:
     needs: get-matrix
     if: ${{ !cancelled() && (needs.get-matrix.result == 'success' || needs.get-matrix.result == 'skipped') }}
@@ -83,11 +87,13 @@ jobs:
         id: cases
         env:
           OS_LATEST: ${{ toJson(fromJson(inputs.test-matrix || needs.get-matrix.outputs.test_matrix).os_latest) }}
+          OS_MATRIX: ${{ toJson(fromJson(inputs.test-matrix || needs.get-matrix.outputs.test_matrix).os_matrix) }}
         run: |
           set -euo pipefail
-          cells=$(jq -c --argjson os_latest "$OS_LATEST" '
-            [.[] | select(.os != "latest") | {os: "ubuntu-latest", case: .}]
+          cells=$(jq -c --argjson os_latest "$OS_LATEST" --argjson os_matrix "$OS_MATRIX" '
+            [.[] | select(.os != "latest" and .os != "matrix") | {os: "ubuntu-latest", case: .}]
             + [$os_latest[] as $os | .[] | select(.os == "latest") | {os: $os, case: .}]
+            + [$os_matrix[] as $os | .[] | select(.os == "matrix") | {os: $os, case: .}]
           ' tests/action_cases.json)
           echo "cells=$cells" >> "$GITHUB_OUTPUT"
         shell: bash
