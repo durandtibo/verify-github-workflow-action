@@ -155,12 +155,15 @@ Conventions:
   release has the feature (the released run skips it).
 - There is one test workflow for both versions (`use-released`); the OS and Python lists come only
   from `lib-get-test-matrix.yaml`.
+- Cover success, failure and edge cases (empty or invalid input, paths with spaces, an empty flags
+  value) with one behaviour per case.
 - Every bug fix needs a test case that fails without the fix.
 - If a check fails for a real reason, report it rather than weakening the test or the linters.
 
 ## Testing strategy
 
-The strategy is the same for all the action repositories of `durandtibo`. This repository follows
+The strategy is the same for all the action repositories of `durandtibo`. The properties the action
+must keep are reviewed in `review/target_state.md`. This repository follows
 it with the layout below (there is no script, so there is no level 1 with mocks, and no Python
 dimension: the action does not run in the user's Python).
 
@@ -184,7 +187,8 @@ Rules:
 - Never write an OS in a workflow: read the list through `lib-get-test-matrix.yaml`.
 - Every input has a case with an invalid or unknown value that asserts the action failed (boolean
   `yes`, version `0.0.0`, unknown flag, missing path). It proves the input reached the tool.
-  Assert an outcome, a marker file or the installed version, never just print them.
+  Assert an outcome, a marker file or the installed version, never just print them, and never
+  assert on a log message.
 - Failure paths use `continue-on-error: true`, an `id`, and a step that asserts `steps.<id>.outcome`.
   A negative test needs a positive run on the same runner before it, so it cannot pass for the
   wrong reason.
