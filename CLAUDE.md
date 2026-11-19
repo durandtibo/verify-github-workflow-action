@@ -102,7 +102,10 @@ there is no unit test suite.
     `nightly.yaml` calls it with `true` (the latest release, pinned). The `test` job runs the
     default usage on `os_matrix`. The cases of `tests/action_cases.json` run one per matrix cell:
     the rows with `"os": "latest"` on `os_latest`, the others on `ubuntu-latest`. `get-cases`
-    reads the file; `dev/check_action_case.sh` asserts one case.
+    turns the file into one matrix cell per case and runner (one `test-cases` job);
+    `dev/check_action_case.sh` asserts one case. The header of the workflow counts the cells.
+  - `ci-docs.yaml`: `make check-readme-sync` (`dev/check_readme_sync.sh`) compares the inputs and
+    defaults of `README.md` with `action.yaml`.
 - `ci-verify-workflows.yaml`: verifies this repo's workflows with the latest released action. It
   has its own triggers and is deliberately not called from `ci.yaml`.
 - `nightly.yaml`: scheduled entry point that calls `ci-action.yaml` with `use-released: true`. It

@@ -12,12 +12,21 @@
 #
 # Two levels of tests:
 #   - general behaviour (`test`): the default usage, on every OS of the matrix (os_matrix)
-#   - edge cases (`test-cases`, `test-cases-os`): one row of tests/action_cases.json per matrix
-#     cell. A row with "os": "latest" depends on the OS (xargs, bash, paths: GNU vs BSD) and
-#     runs on os_latest (Linux and macOS); the others run on one runner (ubuntu-latest).
+#   - edge cases (`test-cases`): one row of tests/action_cases.json per matrix cell. A row with
+#     "os": "latest" depends on the OS (xargs, bash, paths: GNU vs BSD) and runs on every
+#     os_latest runner (Linux and macOS); the others run on one runner (ubuntu-latest).
 #     A new case is a new row, not a new job. A row has "released": false until the last
 #     release has the feature (the released run skips those rows). A row that does not expect a
 #     success follows a positive run on the same runner, so that it cannot fail for the wrong reason.
+#
+# Cost of one run (the same on pull requests, pushes and the schedule, there is no reduced matrix):
+#   cells = len(os_matrix)                                  (test)
+#         + rows without "os"                               (test-cases, ubuntu-latest)
+#         + rows with "os": "latest" x len(os_latest)       (test-cases, Linux and macOS)
+#   With the 31 rows of tests/action_cases.json today (18 without "os", 13 with "os": "latest"
+#   and 2 runners in os_latest): 18 + 13 x 2 = 44 cells for test-cases. The jobs of a matrix
+#   run at most 8 at a time (max-parallel) and are bounded by timeout-minutes. Recount when a
+#   row or a runner is added.
 #
 # The input defaults in the `with:` blocks below must stay equal to the defaults of action.yaml
 # (an input cannot be left unset conditionally): update them on each release.
@@ -54,15 +63,17 @@ jobs:
     permissions:
       contents: read
 
-  # The cases of the edge case tests, as two matrices (one runner, and os_latest)
+  # The cells of the edge case tests, one per case and per runner: a row with "os": "latest"
+  # runs on every os_latest runner, the others on ubuntu-latest
   get-cases:
+    needs: get-matrix
+    if: ${{ !cancelled() && (needs.get-matrix.result == 'success' || needs.get-matrix.result == 'skipped') }}
     permissions:
       contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      cases: ${{ steps.cases.outputs.cases }}
-      cases_os: ${{ steps.cases.outputs.cases_os }}
+      cells: ${{ steps.cases.outputs.cells }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
@@ -70,10 +81,15 @@ jobs:
           persist-credentials: false
       - name: Read the cases
         id: cases
+        env:
+          OS_LATEST: ${{ toJson(fromJson(inputs.test-matrix || needs.get-matrix.outputs.test_matrix).os_latest) }}
         run: |
           set -euo pipefail
-          echo "cases=$(jq -c '[.[] | select(.os != "latest")]' tests/action_cases.json)" >> "$GITHUB_OUTPUT"
-          echo "cases_os=$(jq -c '[.[] | select(.os == "latest")]' tests/action_cases.json)" >> "$GITHUB_OUTPUT"
+          cells=$(jq -c --argjson os_latest "$OS_LATEST" '
+            [.[] | select(.os != "latest") | {os: "ubuntu-latest", case: .}]
+            + [$os_latest[] as $os | .[] | select(.os == "latest") | {os: $os, case: .}]
+          ' tests/action_cases.json)
+          echo "cells=$cells" >> "$GITHUB_OUTPUT"
         shell: bash
 
   # General behaviour: the default usage on every OS of the matrix
@@ -114,20 +130,22 @@ jobs:
         run: ./dev/check_action_case.sh
         shell: bash
 
-  # Edge cases that do not depend on the OS: one row of tests/action_cases.json per cell, on one runner
+  # Edge cases: one cell per row of tests/action_cases.json (and per runner for the rows that depend
+  # on the OS)
   test-cases:
-    needs: [get-matrix, get-cases]
-    if: ${{ !cancelled() && needs.get-cases.result == 'success' && (needs.get-matrix.result == 'success' || needs.get-matrix.result == 'skipped') }}
+    needs: get-cases
+    if: ${{ !cancelled() && needs.get-cases.result == 'success' }}
     permissions:
       actions: read # for the github-token case (zizmor online audits)
       contents: read
-    runs-on: ubuntu-latest
+    name: test-cases (${{ matrix.cell.case.id }}, ${{ matrix.cell.os }})
+    runs-on: ${{ matrix.cell.os }}
     timeout-minutes: 5
     strategy:
       max-parallel: 8
       fail-fast: false
       matrix:
-        case: ${{ fromJson(needs.get-cases.outputs.cases) }}
+        cell: ${{ fromJson(needs.get-cases.outputs.cells) }}
 
     steps:
       - name: Checkout
@@ -138,12 +156,12 @@ jobs:
       # A row that does not expect a success follows a positive run on the same runner, so that the
       # install cannot be the reason of the failure
       - name: Positive control before a failure case (local)
-        if: ${{ !inputs.use-released && matrix.case.expect != 'success' }}
+        if: ${{ !inputs.use-released && matrix.cell.case.expect != 'success' }}
         uses: ./
         with:
           paths: tests/fixtures/valid/ok.yaml
       - name: Positive control before a failure case (released)
-        if: ${{ inputs.use-released && matrix.case.released && matrix.case.expect != 'success' }}
+        if: ${{ inputs.use-released && matrix.cell.case.released && matrix.cell.case.expect != 'success' }}
         uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
         with:
           paths: tests/fixtures/valid/ok.yaml
@@ -158,9 +176,9 @@ jobs:
       # Some rows verify the default directory (no paths): copy a fixture into it, in the
       # checkout of this job only
       - name: Add the fixture to the default directory
-        if: ${{ matrix.case.setup && (!inputs.use-released || matrix.case.released) }}
+        if: ${{ matrix.cell.case.setup && (!inputs.use-released || matrix.cell.case.released) }}
         env:
-          FIXTURE: ${{ matrix.case.setup }}
+          FIXTURE: ${{ matrix.cell.case.setup }}
         run: |
           set -euo pipefail
           cp "$FIXTURE" .github/workflows/zz-fixture.yaml
@@ -172,143 +190,42 @@ jobs:
         continue-on-error: true
         uses: ./
         with:
-          paths: ${{ matrix.case.inputs['paths'] || '' }}
-          actionlint: ${{ matrix.case.inputs['actionlint'] || 'true' }}
-          actionlint-version: ${{ matrix.case.inputs['actionlint-version'] || '1.7.12' }}
-          actionlint-flags: ${{ matrix.case.inputs['actionlint-flags'] || '' }}
-          zizmor: ${{ matrix.case.inputs['zizmor'] || 'true' }}
-          zizmor-version: ${{ matrix.case.inputs['zizmor-version'] || '1.32.0' }}
-          zizmor-flags: ${{ matrix.case.inputs['zizmor-flags'] || '' }}
-          github-token: ${{ matrix.case.inputs['github-token'] == 'workflow' && github.token || matrix.case.inputs['github-token'] || '' }}
+          paths: ${{ matrix.cell.case.inputs['paths'] || '' }}
+          actionlint: ${{ matrix.cell.case.inputs['actionlint'] || 'true' }}
+          actionlint-version: ${{ matrix.cell.case.inputs['actionlint-version'] || '1.7.12' }}
+          actionlint-flags: ${{ matrix.cell.case.inputs['actionlint-flags'] || '' }}
+          zizmor: ${{ matrix.cell.case.inputs['zizmor'] || 'true' }}
+          zizmor-version: ${{ matrix.cell.case.inputs['zizmor-version'] || '1.32.0' }}
+          zizmor-flags: ${{ matrix.cell.case.inputs['zizmor-flags'] || '' }}
+          github-token: ${{ matrix.cell.case.inputs['github-token'] == 'workflow' && github.token || matrix.cell.case.inputs['github-token'] || '' }}
       # The pinned release (v0.0.3) has other inputs (version, flags): the rows that need the
       # current inputs have "released": false. Once the pinned release is v0.1.0, flip them.
       - name: Run the case (released)
         id: released
-        if: ${{ inputs.use-released && matrix.case.released }}
+        if: ${{ inputs.use-released && matrix.cell.case.released }}
         continue-on-error: true
         uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
         with:
-          paths: ${{ matrix.case.inputs['paths'] || '' }}
-          actionlint: ${{ matrix.case.inputs['actionlint'] || 'true' }}
-          actionlint-version: ${{ matrix.case.inputs['actionlint-version'] || '1.7.12' }}
-          actionlint-flags: ${{ matrix.case.inputs['actionlint-flags'] || '' }}
-          zizmor: ${{ matrix.case.inputs['zizmor'] || 'true' }}
-          zizmor-version: ${{ matrix.case.inputs['zizmor-version'] || '1.32.0' }}
-          zizmor-flags: ${{ matrix.case.inputs['zizmor-flags'] || '' }}
-          github-token: ${{ matrix.case.inputs['github-token'] == 'workflow' && github.token || matrix.case.inputs['github-token'] || '' }}
+          paths: ${{ matrix.cell.case.inputs['paths'] || '' }}
+          actionlint: ${{ matrix.cell.case.inputs['actionlint'] || 'true' }}
+          actionlint-version: ${{ matrix.cell.case.inputs['actionlint-version'] || '1.7.12' }}
+          actionlint-flags: ${{ matrix.cell.case.inputs['actionlint-flags'] || '' }}
+          zizmor: ${{ matrix.cell.case.inputs['zizmor'] || 'true' }}
+          zizmor-version: ${{ matrix.cell.case.inputs['zizmor-version'] || '1.32.0' }}
+          zizmor-flags: ${{ matrix.cell.case.inputs['zizmor-flags'] || '' }}
+          github-token: ${{ matrix.cell.case.inputs['github-token'] == 'workflow' && github.token || matrix.cell.case.inputs['github-token'] || '' }}
 
       - name: Remove the fixture from the default directory
-        if: ${{ always() && matrix.case.setup && (!inputs.use-released || matrix.case.released) }}
+        if: ${{ always() && matrix.cell.case.setup && (!inputs.use-released || matrix.cell.case.released) }}
         run: |
           set -euo pipefail
           rm -f .github/workflows/zz-fixture.yaml
         shell: bash
 
       - name: Check the case
-        if: ${{ !inputs.use-released || matrix.case.released }}
+        if: ${{ !inputs.use-released || matrix.cell.case.released }}
         env:
-          CASE: ${{ toJson(matrix.case) }}
-          OUTCOME: ${{ steps.local.outcome == 'skipped' && steps.released.outcome || steps.local.outcome }}
-          # The pinned release (v0.0.3) does not create the ran-<tool> markers yet
-          CHECK_MARKERS: ${{ !inputs.use-released }}
-        run: ./dev/check_action_case.sh
-        shell: bash
-
-  # Edge cases that depend on the OS (failure detection, flags, paths): one row per cell, on os_latest
-  test-cases-os:
-    needs: [get-matrix, get-cases]
-    if: ${{ !cancelled() && needs.get-cases.result == 'success' && (needs.get-matrix.result == 'success' || needs.get-matrix.result == 'skipped') }}
-    permissions:
-      actions: read # for the github-token case (zizmor online audits)
-      contents: read
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 5
-    strategy:
-      max-parallel: 8
-      fail-fast: false
-      matrix:
-        os: ${{ fromJson(inputs.test-matrix || needs.get-matrix.outputs.test_matrix).os_latest }}
-        case: ${{ fromJson(needs.get-cases.outputs.cases_os) }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      # A row that does not expect a success follows a positive run on the same runner, so that the
-      # install cannot be the reason of the failure
-      - name: Positive control before a failure case (local)
-        if: ${{ !inputs.use-released && matrix.case.expect != 'success' }}
-        uses: ./
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-      - name: Positive control before a failure case (released)
-        if: ${{ inputs.use-released && matrix.case.released && matrix.case.expect != 'success' }}
-        uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
-        with:
-          paths: tests/fixtures/valid/ok.yaml
-
-      # The markers of the control run must not leak into the assertions of the case
-      - name: Reset the markers
-        run: |
-          set -euo pipefail
-          rm -f "$RUNNER_TEMP/verify-workflows/ran-actionlint" "$RUNNER_TEMP/verify-workflows/ran-zizmor"
-        shell: bash
-
-      # Some rows verify the default directory (no paths): copy a fixture into it, in the
-      # checkout of this job only
-      - name: Add the fixture to the default directory
-        if: ${{ matrix.case.setup && (!inputs.use-released || matrix.case.released) }}
-        env:
-          FIXTURE: ${{ matrix.case.setup }}
-        run: |
-          set -euo pipefail
-          cp "$FIXTURE" .github/workflows/zz-fixture.yaml
-        shell: bash
-
-      - name: Run the case (local)
-        id: local
-        if: ${{ !inputs.use-released }}
-        continue-on-error: true
-        uses: ./
-        with:
-          paths: ${{ matrix.case.inputs['paths'] || '' }}
-          actionlint: ${{ matrix.case.inputs['actionlint'] || 'true' }}
-          actionlint-version: ${{ matrix.case.inputs['actionlint-version'] || '1.7.12' }}
-          actionlint-flags: ${{ matrix.case.inputs['actionlint-flags'] || '' }}
-          zizmor: ${{ matrix.case.inputs['zizmor'] || 'true' }}
-          zizmor-version: ${{ matrix.case.inputs['zizmor-version'] || '1.32.0' }}
-          zizmor-flags: ${{ matrix.case.inputs['zizmor-flags'] || '' }}
-          github-token: ${{ matrix.case.inputs['github-token'] == 'workflow' && github.token || matrix.case.inputs['github-token'] || '' }}
-      # The pinned release (v0.0.3) has other inputs (version, flags): the rows that need the
-      # current inputs have "released": false. Once the pinned release is v0.1.0, flip them.
-      - name: Run the case (released)
-        id: released
-        if: ${{ inputs.use-released && matrix.case.released }}
-        continue-on-error: true
-        uses: durandtibo/verify-github-workflow-action@e5dc341675711838a82b2433f70a225858ad70d1 # ratchet:durandtibo/verify-github-workflow-action@v0.0.3
-        with:
-          paths: ${{ matrix.case.inputs['paths'] || '' }}
-          actionlint: ${{ matrix.case.inputs['actionlint'] || 'true' }}
-          actionlint-version: ${{ matrix.case.inputs['actionlint-version'] || '1.7.12' }}
-          actionlint-flags: ${{ matrix.case.inputs['actionlint-flags'] || '' }}
-          zizmor: ${{ matrix.case.inputs['zizmor'] || 'true' }}
-          zizmor-version: ${{ matrix.case.inputs['zizmor-version'] || '1.32.0' }}
-          zizmor-flags: ${{ matrix.case.inputs['zizmor-flags'] || '' }}
-          github-token: ${{ matrix.case.inputs['github-token'] == 'workflow' && github.token || matrix.case.inputs['github-token'] || '' }}
-
-      - name: Remove the fixture from the default directory
-        if: ${{ always() && matrix.case.setup && (!inputs.use-released || matrix.case.released) }}
-        run: |
-          set -euo pipefail
-          rm -f .github/workflows/zz-fixture.yaml
-        shell: bash
-
-      - name: Check the case
-        if: ${{ !inputs.use-released || matrix.case.released }}
-        env:
-          CASE: ${{ toJson(matrix.case) }}
+          CASE: ${{ toJson(matrix.cell.case) }}
           OUTCOME: ${{ steps.local.outcome == 'skipped' && steps.released.outcome || steps.local.outcome }}
           # The pinned release (v0.0.3) does not create the ran-<tool> markers yet
           CHECK_MARKERS: ${{ !inputs.use-released }}

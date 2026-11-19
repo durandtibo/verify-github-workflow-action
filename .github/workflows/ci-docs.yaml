@@ -1,0 +1,28 @@
+# Documentation check workflow.
+# Checks that README.md and action.yaml describe the same inputs and defaults
+# (make check-readme-sync, dev/check_readme_sync.sh). Nothing else would notice a renamed
+# input or a changed default.
+
+name: Docs
+on:
+  workflow_call:
+  workflow_dispatch: # to trigger manually
+
+permissions: {}
+
+jobs:
+  readme-sync:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check that the README matches action.yaml
+        run: |
+          make check-readme-sync
