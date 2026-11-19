@@ -7,16 +7,20 @@ Guidance for coding agents working in this repository.
 A GitHub composite action (`action.yaml`) that verifies GitHub workflow files with
 [actionlint](https://github.com/rhysd/actionlint) and
 [zizmor](https://github.com/zizmorcore/zizmor). There is no separate script: all logic lives in the
-bash steps of `action.yaml` (they must work on Linux and macOS runners with `shell: bash`).
+bash steps of `action.yaml` (they must work on Linux and macOS runners with `shell: bash`;
+Windows is not supported and not tested).
 It is tested by running the action itself in workflows (`ci-action.yaml`, called by `ci.yaml`
 and `nightly.yaml`) on the cases of `tests/action_cases.json` and the fixtures in `tests/fixtures/`;
 there is no unit test suite.
-`review/target_state.md` is a review of the action against its properties (not part of the action).
+`dev/` holds maintainer helpers (`check_action_case.sh`, `check_readme_sync.sh`) and
+`review/target_state.md` is a review of the action against its properties; none of them is part of
+the action.
 
 ## Environment
 
 - Use the `Makefile`; run `make help` to list targets (`make format`, `make lint`,
-  `make lint-actions`, `make zizmor`, ...).
+  `make lint-actions`, `make zizmor`, `make test`, ...). `make test` only runs
+  `make check-readme-sync`: the action itself is tested by CI.
 - Do not edit `.make/`: it is a shared directory synced by `bot-sync-shared-makefile.yaml`.
 - Run `make format` and `make lint` before committing. Fix what they report instead of disabling
   rules (config: `.markdownlint.json`, `.yamllint.yaml`). `make format` rewrites files.
@@ -81,6 +85,8 @@ there is no unit test suite.
 - Only ship what the action needs at runtime: it is self-contained in `action.yaml` and downloads
   its tools. Never make it read tests, fixtures or other repo files of this repository, because
   consumers only get `action.yaml`, and `uses: ./` runs the whole checkout and hides a missing file.
+  There is no `.gitattributes`: the action has no script to export, so a new file the action reads
+  would be a design change to flag.
 - `github-token` reaches zizmor as `GH_TOKEN` through `env:`; unset it when empty. zizmor gets
   `--format=github` unless the flags contain `--format`.
 - `actionlint` and `zizmor` accept only `true` or `false`; anything else fails.
@@ -158,6 +164,11 @@ Conventions:
   release has the feature (the released run skips it).
 - There is one test workflow for both versions (`use-released`); the OS and Python lists come only
   from `lib-get-test-matrix.yaml`.
+- Each job has one action step per version, `uses: ./` with `if: ${{ !inputs.use-released }}` and
+  the pinned release with `if: ${{ inputs.use-released }}`, and one shared verify step. The
+  assertions live in `dev/check_action_case.sh`, never duplicated in two workflows.
+- Keep the README inputs and defaults in step with `action.yaml` (`make check-readme-sync`,
+  run by `ci-docs.yaml`).
 - Cover success, failure and edge cases (empty or invalid input, paths with spaces, an empty flags
   value) with one behaviour per case.
 - Every bug fix needs a test case that fails without the fix.
@@ -202,6 +213,6 @@ Rules:
 
 ## Reporting
 
-- State which checks ran (`make format`, `make lint`, `make zizmor`) and which did not.
+- State which checks ran (`make format`, `make lint`, `make zizmor`, `make test`) and which did not.
 - Note that CI was not awaited, and that the workflows could not be run locally.
 - Report failures that already exist on `main` rather than hiding them.
