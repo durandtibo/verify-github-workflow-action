@@ -8,8 +8,9 @@ A GitHub composite action (`action.yaml`) that verifies GitHub workflow files wi
 [actionlint](https://github.com/rhysd/actionlint) and
 [zizmor](https://github.com/zizmorcore/zizmor). There is no separate script: all logic lives in the
 bash steps of `action.yaml` (they must work on Linux and macOS runners with `shell: bash`).
-It is tested by running the action itself in workflows (`ci-action.yaml`,
-`nightly-test-released.yaml`) on the fixtures in `tests/fixtures/`; there is no unit test suite.
+It is tested by running the action itself in workflows (`ci-action.yaml`, called by `ci.yaml`
+and `nightly.yaml`) on the cases of `tests/action_cases.json` and the fixtures in `tests/fixtures/`;
+there is no unit test suite.
 `review/target_state.md` is a review of the action against its properties (not part of the action).
 
 ## Environment
@@ -44,7 +45,9 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
   examples only as part of a release.
 - Release checklist: bump the default `actionlint-version` and `zizmor-version` in `action.yaml`
   and `README.md` (and the pinned installer SHA if actionlint changes), tag, then update the
-  pinned version in `README.md`, `ci-verify-workflows.yaml` and `nightly-test-released.yaml`.
+  pinned version in `README.md`, `ci-verify-workflows.yaml` and `ci-action.yaml` (the released action
+  steps), flip `"released"` to `true` in `tests/action_cases.json` for the cases the release
+  supports, and update the input defaults duplicated in the `with:` blocks of `ci-action.yaml`.
 
 ## Action rules (`action.yaml`)
 
@@ -87,20 +90,23 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
 - Files are prefixed by their role: `ci-`, `nightly-`, `lib-`, `bot-`, `security-`.
 - `ci.yaml`: entry point for pull requests, pushes to `main`, a nightly schedule and manual runs. It
   holds no steps, only jobs that call the reusable workflows below. It tests the current checkout.
-  - `lib-get-test-matrix.yaml`: loads the OS list (`os_unix`) from
-    `durandtibo/workflow-config-action` once and exposes it as `os_matrix` in the `test_matrix`
-    JSON output; callers pass it down to the test workflows. Never
-    hardcode the OS list.
+  - `lib-get-test-matrix.yaml`: loads the OS and Python lists from
+    `durandtibo/workflow-config-action` once and exposes them in the `test_matrix` JSON output
+    (`os_matrix`, `os_macos`, `os_latest`, `python_versions`, `python_versions_standard`); callers
+    pass it down to the test workflows. Never hardcode an OS or a Python version. The action does
+    not depend on the user's Python, so no job crosses `python_versions`.
   - `ci-format.yaml`: read-only markdownlint and yamllint checks (`make lint-markdown`,
     `make lint-yaml`).
-  - `ci-action.yaml`: runs the action from this checkout (the version not released yet) on the
-    full OS matrix and with different input combinations (custom versions and flags, `latest`,
-    `github-token`, paths, actionlint disabled, zizmor disabled, both disabled). It also runs the
-    action on the invalid fixtures and asserts that it fails (`test-fixtures`, `test-failure-os`).
+  - `ci-action.yaml`: one reusable workflow with a boolean input `use-released` (default `false`).
+    `ci.yaml` calls it with `false` (the action from this checkout, not released yet);
+    `nightly.yaml` calls it with `true` (the latest release, pinned). The `test` job runs the
+    default usage on `os_matrix`. The cases of `tests/action_cases.json` run one per matrix cell:
+    the rows with `"os": "latest"` on `os_latest`, the others on `ubuntu-latest`. `get-cases`
+    reads the file; `dev/check_action_case.sh` asserts one case.
 - `ci-verify-workflows.yaml`: verifies this repo's workflows with the latest released action. It
   has its own triggers and is deliberately not called from `ci.yaml`.
-- `nightly.yaml`: scheduled entry point that tests the latest released action.
-  - `nightly-test-released.yaml`: runs the latest released action (pinned, update it on release).
+- `nightly.yaml`: scheduled entry point that calls `ci-action.yaml` with `use-released: true`. It
+  is not part of `ci.yaml`.
 - `security-dependency-review.yaml`: dependency review on pull requests.
 - `bot-pin-action.yaml`: scheduled automation that pins actions to SHAs with ratchet and opens a PR.
 - `bot-cancel-stale-queued-runs.yaml`: scheduled automation that cancels stale queued runs.
@@ -134,27 +140,36 @@ Conventions:
 - A negative test needs a positive run (valid fixture, expected success) on the same runner
   before it, so an install problem fails there and the negative run cannot pass for the
   wrong reason.
-- `test-inputs` uses explicit newline-separated files in `paths`, never globs (they are not
-  expanded). `test-both-tools-run` checks the `ran-<tool>` marker files.
+- A new case is a row of `tests/action_cases.json`, not a new job: `id`, `inputs`, `expect`
+  (`success`, `failure`, or `any` when only the side effects matter), `markers` (which tools must
+  have started, from their `ran-<tool>` files), `released`, and optionally `os` (`latest` when
+  the case depends on the OS), `setup` (a fixture copied into `.github/workflows` for the default
+  discovery) and `actionlint-version` (the installed version). `paths` uses explicit
+  newline-separated files, never globs (they are not expanded).
+- The assertions live in `dev/check_action_case.sh`, shared by the local and the released runs:
+  outcome, markers, installed version, clean `git status`, no `pwned` file (flag injection).
 - Failure paths are tested with `continue-on-error: true`, an `id`, and a step asserting
   `steps.<id>.outcome`.
-- Every new or changed input needs a job in `ci-action.yaml` exercising it (including the
-  disabled and default paths). Mirror the relevant case in `nightly-test-released.yaml` once released.
-- Keep the OS matrix in both test workflows identical (it comes from `lib-get-test-matrix.yaml`).
+- Every new or changed input needs a row in `tests/action_cases.json` exercising it (including the
+  disabled, default and invalid-value paths). A row has `"released": false` until the pinned
+  release has the feature (the released run skips it).
+- There is one test workflow for both versions (`use-released`); the OS and Python lists come only
+  from `lib-get-test-matrix.yaml`.
 - Every bug fix needs a test case that fails without the fix.
 - If a check fails for a real reason, report it rather than weakening the test or the linters.
 
 ## Testing strategy
 
 The strategy is the same for all the action repositories of `durandtibo`. This repository follows
-it with the layout below (there is no script, so there is no level 1 with mocks).
+it with the layout below (there is no script, so there is no level 1 with mocks, and no Python
+dimension: the action does not run in the user's Python).
 
 Levels:
 
 1. **Local action**: the action from this checkout (`uses: ./`) in a real workflow
    (`ci-action.yaml`, called by `ci.yaml`, on pull requests, pushes and the schedule).
 2. **Released action**: the latest stable release, pinned, with the same cases as level 1
-   (`nightly-test-released.yaml`, called by `nightly.yaml`). Never run it on pull requests.
+   (the same `ci-action.yaml` with `use-released: true`, called by `nightly.yaml`). Never run it on pull requests.
 
 Rules:
 
