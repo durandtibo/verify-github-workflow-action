@@ -9,7 +9,8 @@ A GitHub composite action (`action.yaml`) that verifies GitHub workflow files wi
 [zizmor](https://github.com/zizmorcore/zizmor). There is no separate script: all logic lives in the
 bash steps of `action.yaml` (they must work on Linux and macOS runners with `shell: bash`).
 It is tested by running the action itself in workflows (`ci-action.yaml`,
-`nightly-test-released.yaml`); there is no unit test suite.
+`nightly-test-released.yaml`) on the fixtures in `tests/fixtures/`; there is no unit test suite.
+`review/target_state.md` is a review of the action against its properties (not part of the action).
 
 ## Environment
 
@@ -34,6 +35,8 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
   number, so do not add one.
 - PR descriptions follow `.github/PULL_REQUEST_TEMPLATE.md` and cover what changed, what was
   deliberately left alone, and any behaviour change.
+- Do not escape special characters such as the backtick (`` ` ``) in PR titles and descriptions
+  (no `\``): the escape characters are not rendered well. Write them as plain Markdown.
 - On conflicts with `main`, merge `origin/main` into the branch; do not rebase and force-push.
 - Update `README.md` when inputs, behaviour, or workflows change.
 - Releases are immutable exact version tags (`v0.0.3`, ...). Do not create or move floating tags
@@ -72,6 +75,9 @@ It is tested by running the action itself in workflows (`ci-action.yaml`,
   syntax (`${var^^}`, `${!var}`, `mapfile`, ...).
 - Never execute anything from a moving ref: the actionlint installer is pinned to a commit SHA,
   and the default tool versions are exact. Releasing bumps them (see below).
+- Only ship what the action needs at runtime: it is self-contained in `action.yaml` and downloads
+  its tools. Never make it read tests, fixtures or other repo files of this repository, because
+  consumers only get `action.yaml`, and `uses: ./` runs the whole checkout and hides a missing file.
 - `github-token` reaches zizmor as `GH_TOKEN` through `env:`; unset it when empty. zizmor gets
   `--format=github` unless the flags contain `--format`.
 - `actionlint` and `zizmor` accept only `true` or `false`; anything else fails.
@@ -137,6 +143,39 @@ Conventions:
 - Keep the OS matrix in both test workflows identical (it comes from `lib-get-test-matrix.yaml`).
 - Every bug fix needs a test case that fails without the fix.
 - If a check fails for a real reason, report it rather than weakening the test or the linters.
+
+## Testing strategy
+
+The strategy is the same for all the action repositories of `durandtibo`. This repository follows
+it with the layout below (there is no script, so there is no level 1 with mocks).
+
+Levels:
+
+1. **Local action**: the action from this checkout (`uses: ./`) in a real workflow
+   (`ci-action.yaml`, called by `ci.yaml`, on pull requests, pushes and the schedule).
+2. **Released action**: the latest stable release, pinned, with the same cases as level 1
+   (`nightly-test-released.yaml`, called by `nightly.yaml`). Never run it on pull requests.
+
+Rules:
+
+- Test a behaviour at the cheapest level that can show it. The action tests check the contract and
+  the wiring: inputs reach the tools, the action fails on an invalid input or a finding. Do not
+  re-test what actionlint or zizmor already do.
+- Split the tests in two. **General behaviour** (default usage, failure detection, flag
+  tokenization, which differ per OS) runs on the full `os_matrix`. **Edge cases** (one input, one
+  invalid value, an unusual path) run on one runner (`ubuntu-latest`). There is no reduced matrix
+  on pull requests.
+- Never write an OS in a workflow: read the list through `lib-get-test-matrix.yaml`.
+- Every input has a case with an invalid or unknown value that asserts the action failed (boolean
+  `yes`, version `0.0.0`, unknown flag, missing path). It proves the input reached the tool.
+  Assert an outcome, a marker file or the installed version, never just print them.
+- Failure paths use `continue-on-error: true`, an `id`, and a step that asserts `steps.<id>.outcome`.
+  A negative test needs a positive run on the same runner before it, so it cannot pass for the
+  wrong reason.
+- Tests have no side effect outside the runner: use throwaway files, and check that `git status`
+  stays clean when the case could write into the workspace. If something cannot be tested in CI,
+  write down which check covers it.
+- Set `timeout-minutes` on every job and `fail-fast: false` on matrix jobs.
 
 ## Reporting
 
