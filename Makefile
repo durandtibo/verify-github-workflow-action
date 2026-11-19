@@ -13,11 +13,15 @@ zizmor: install-zizmor ## Run zizmor with autofixes on the GitHub workflows
 check-readme-sync: ## Check that README.md and action.yaml describe the same inputs
 	@./dev/check_readme_sync.sh
 
+.PHONY : check-export
+check-export: ## Check that the exported files are the files the action needs
+	@./dev/check_export.sh
+
 .PHONY : all
 all: format lint ## Format and lint everything
 
 .PHONY : test
-test: check-readme-sync ## Run the local checks (the action itself is only tested by CI)
+test: check-readme-sync check-export ## Run the local checks (the action itself is only tested by CI)
 
 .PHONY : clean
 clean: ## Nothing to clean: the action has no build artifacts

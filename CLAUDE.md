@@ -20,7 +20,7 @@ the action.
 
 - Use the `Makefile`; run `make help` to list targets (`make format`, `make lint`,
   `make lint-actions`, `make zizmor`, `make test`, ...). `make test` only runs
-  `make check-readme-sync`: the action itself is tested by CI.
+  `make check-readme-sync` and `make check-export`: the action itself is tested by CI.
 - Do not edit `.make/`: it is a shared directory synced by `bot-sync-shared-makefile.yaml`.
 - Run `make format` and `make lint` before committing. Fix what they report instead of disabling
   rules (config: `.markdownlint.json`, `.yamllint.yaml`). `make format` rewrites files.
@@ -65,6 +65,10 @@ the action.
   an empty flags value must produce zero arguments.
 - Each step has a `name:` and a comment saying what it does.
 - Code in `run:` blocks must stay clean under `shellcheck`; justify any `# shellcheck disable`.
+- Quote all variables and validate inputs early with a clear `::error::` message (as the
+  `true`/`false` check and the missing `pipx` check do). Keep logic in small shell functions when a
+  step grows, and never rely on `set -e` inside a function called from an `||` or `if` list: it is
+  turned off there, so follow a command that can fail with an explicit `return 1`.
 - Structure: three steps (`Prepare`, `actionlint`, `zizmor`); each tool step installs and runs.
   Keep it that way.
 - The tool steps use
@@ -84,9 +88,11 @@ the action.
   and the default tool versions are exact. Releasing bumps them (see below).
 - Only ship what the action needs at runtime: it is self-contained in `action.yaml` and downloads
   its tools. Never make it read tests, fixtures or other repo files of this repository, because
-  consumers only get `action.yaml`, and `uses: ./` runs the whole checkout and hides a missing file.
-  There is no `.gitattributes`: the action has no script to export, so a new file the action reads
-  would be a design change to flag.
+  consumers only get the exported files, and `uses: ./` runs the whole checkout and hides a missing
+  file. `.gitattributes` marks everything except `action.yaml` and `LICENSE` as `export-ignore`.
+  A new file the action reads would be a design change to flag: un-ignore it in `.gitattributes`
+  and add it to `EXPECTED` in `dev/check_export.sh`. Check the exported set with
+  `make check-export` (`git archive --worktree-attributes HEAD | tar t`).
 - `github-token` reaches zizmor as `GH_TOKEN` through `env:`; unset it when empty. zizmor gets
   `--format=github` unless the flags contain `--format`.
 - `actionlint` and `zizmor` accept only `true` or `false`; anything else fails.
@@ -111,6 +117,8 @@ the action.
     the others on `ubuntu-latest`. `get-cases`
     turns the file into one matrix cell per case and runner (one `test-cases` job);
     `dev/check_action_case.sh` asserts one case. The header of the workflow counts the cells.
+  - `ci-export.yaml`: `make check-export` (`dev/check_export.sh`) checks that the files exported by
+    `git archive` are exactly the files the action needs (`action.yaml`, `LICENSE`).
   - `ci-docs.yaml`: `make check-readme-sync` (`dev/check_readme_sync.sh`) compares the inputs and
     defaults of `README.md` with `action.yaml`.
 - `ci-verify-workflows.yaml`: verifies this repo's workflows with the latest released action. It
@@ -218,3 +226,4 @@ Rules:
 - State which checks ran (`make format`, `make lint`, `make zizmor`, `make test`) and which did not.
 - Note that CI was not awaited, and that the workflows could not be run locally.
 - Report failures that already exist on `main` rather than hiding them.
+- If a check could not run (a tool is missing, or it only runs in CI), say which one and why.
