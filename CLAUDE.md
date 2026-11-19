@@ -179,6 +179,8 @@ Conventions:
   assertions live in `dev/check_action_case.sh`, never duplicated in two workflows.
 - Keep the README inputs and defaults in step with `action.yaml` (`make check-readme-sync`,
   run by `ci-docs.yaml`).
+- Every command run by CI is a `make` target, so a local run matches CI. Checks that need GitHub
+  (the action itself) cannot run locally: say so in the PR.
 - Cover success, failure and edge cases (empty or invalid input, paths with spaces, an empty flags
   value) with one behaviour per case.
 - Every bug fix needs a test case that fails without the fix.
@@ -186,9 +188,10 @@ Conventions:
 
 ## Testing strategy
 
-The strategy is the same for all the action repositories of `durandtibo`. The properties the action
-must keep are reviewed in `review/target_state.md`. This repository follows
-it with the layout below (there is no script, so there is no level 1 with mocks, and no Python
+The strategy is the same for all the action repositories of `durandtibo`; its reasoning and the
+properties T1 to T16 are in `durandtibo/cancel-queued-runs-action` (`review/testing.md`). The
+properties the action must keep are reviewed in `review/target_state.md`. This repository follows
+the strategy with the layout below (there is no script, so there is no level 1 with mocks, and no Python
 dimension: the action does not run in the user's Python).
 
 Levels:
@@ -209,6 +212,13 @@ Rules:
   invalid value, an unusual path) run on one runner (`ubuntu-latest`). There is no reduced matrix
   on pull requests.
 - Never write an OS in a workflow: read the list through `lib-get-test-matrix.yaml`.
+- Supported equals tested: the README claims Linux and macOS (x64 and ARM) and every OS of
+  `os_matrix` is tested; Windows is not claimed, so it is not tested. Add a platform to the README
+  only together with its matrix cell.
+- The tools are downloaded at each run, so a nightly failure that does not reproduce on the current
+  checkout can come from upstream (actionlint, zizmor, the runner image).
+- Matrices use `max-parallel`, and the number of cells per run is counted in the header of
+  `ci-action.yaml`: recount it when a row or a runner is added.
 - Every input has a case with an invalid or unknown value that asserts the action failed (boolean
   `yes`, version `0.0.0`, unknown flag, missing path). It proves the input reached the tool.
   Assert an outcome, a marker file or the installed version, never just print them, and never
