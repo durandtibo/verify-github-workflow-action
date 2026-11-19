@@ -169,7 +169,8 @@ Levels:
 1. **Local action**: the action from this checkout (`uses: ./`) in a real workflow
    (`ci-action.yaml`, called by `ci.yaml`, on pull requests, pushes and the schedule).
 2. **Released action**: the latest stable release, pinned, with the same cases as level 1
-   (the same `ci-action.yaml` with `use-released: true`, called by `nightly.yaml`). Never run it on pull requests.
+   (the same `ci-action.yaml` with `use-released: true`, called by `nightly.yaml`). Never run it
+   on pull requests.
 
 Rules:
 
